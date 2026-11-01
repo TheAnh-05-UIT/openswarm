@@ -1,0 +1,725 @@
+{
+  "name": "openswarm-${RUN_ID:?set fresh RUN_ID}",
+  "services": {
+    "bundle-init": {
+      "platform": "linux/arm64",
+      "restart": "no",
+      "user": "0:0",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 64,
+      "cpus": 0.5,
+      "mem_limit": "128m",
+      "stop_grace_period": "30s",
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      },
+      "tmpfs": [
+        "/tmp:rw,nosuid,nodev,size=134217728,uid=65532,gid=65532"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONUNBUFFERED": "1",
+        "IMAGE_NAMESPACE": "${IMAGE_NAMESPACE:?set IMAGE_NAMESPACE}",
+        "SN_VERSION": "${SN_VERSION:?set SN_VERSION}",
+        "SL_VERSION": "${SL_VERSION:?set SL_VERSION}",
+        "USER_TF_VERSION": "${USER_TF_VERSION:?set USER_TF_VERSION}",
+        "SWOP_VERSION": "${SWOP_VERSION:?set SWOP_VERSION}",
+        "RUN_ID": "${RUN_ID:?set RUN_ID}",
+        "EXCLUSIVE_OWNER_ACK": "${EXCLUSIVE_OWNER_ACK:?set EXCLUSIVE_OWNER_ACK}",
+        "SN_PORT": "${SN_PORT:?set SN_PORT}",
+        "SL_PORT": "${SL_PORT:?set SL_PORT}",
+        "CONTROLLER_PORT": "${CONTROLLER_PORT:?set CONTROLLER_PORT}",
+        "ROUNDS": "${ROUNDS:?set ROUNDS}",
+        "SAMPLES_A": "${SAMPLES_A:?set SAMPLES_A}",
+        "SAMPLES_B": "${SAMPLES_B:?set SAMPLES_B}",
+        "DATA_SEED_A": "${DATA_SEED_A:?set DATA_SEED_A}",
+        "DATA_SEED_B": "${DATA_SEED_B:?set DATA_SEED_B}",
+        "EPOCHS": "${EPOCHS:?set EPOCHS}",
+        "BATCH_SIZE": "${BATCH_SIZE:?set BATCH_SIZE}",
+        "LEARNING_RATE": "${LEARNING_RATE:?set LEARNING_RATE}",
+        "STARTUP_TIMEOUT": "${STARTUP_TIMEOUT:?set STARTUP_TIMEOUT}",
+        "ROUND_TIMEOUT": "${ROUND_TIMEOUT:?set ROUND_TIMEOUT}"
+      },
+      "image": "${IMAGE_NAMESPACE:?set namespace}/independent-swop:${SWOP_VERSION:?set explicit version}",
+      "network_mode": "none",
+      "cap_add": [
+        "CHOWN",
+        "SETUID",
+        "SETGID"
+      ],
+      "entrypoint": [
+        "python",
+        "/config/initialize.py"
+      ],
+      "command": [],
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "./config",
+          "target": "/config",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "volume",
+          "source": "deployment",
+          "target": "/deployment",
+          "read_only": false
+        },
+        {
+          "type": "volume",
+          "source": "checkpoint-a",
+          "target": "/checkpoint-a",
+          "read_only": false
+        },
+        {
+          "type": "volume",
+          "source": "checkpoint-b",
+          "target": "/checkpoint-b",
+          "read_only": false
+        },
+        {
+          "type": "volume",
+          "source": "controller-data",
+          "target": "/controller-data",
+          "read_only": false
+        }
+      ]
+    },
+    "sn": {
+      "platform": "linux/arm64",
+      "restart": "no",
+      "user": "65532:65532",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 256,
+      "cpus": 1,
+      "mem_limit": "512m",
+      "stop_grace_period": "30s",
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      },
+      "tmpfs": [
+        "/tmp:rw,nosuid,nodev,size=134217728,uid=65532,gid=65532"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONUNBUFFERED": "1",
+        "HTTP_PORT": "${SN_PORT:?}"
+      },
+      "networks": {
+        "swarm": {
+          "aliases": [
+            "sn.openswarm.internal"
+          ]
+        }
+      },
+      "image": "${IMAGE_NAMESPACE:?set namespace}/independent-sn:${SN_VERSION:?set explicit version}",
+      "entrypoint": [
+        "python",
+        "-m",
+        "sn_mvp"
+      ],
+      "command": [
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "${SN_PORT:?set SN_PORT}",
+        "--peer-ttl",
+        "180"
+      ],
+      "depends_on": {
+        "bundle-init": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ['HTTP_PORT']+'/health',timeout=2).read()"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "45s",
+        "retries": 18
+      }
+    },
+    "sl-a": {
+      "platform": "linux/arm64",
+      "restart": "no",
+      "user": "65532:65532",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 256,
+      "cpus": 1,
+      "mem_limit": "512m",
+      "stop_grace_period": "30s",
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      },
+      "tmpfs": [
+        "/tmp:rw,nosuid,nodev,size=134217728,uid=65532,gid=65532"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "/app",
+        "SWOP_CONFIG": "/deployment/bundle/sl-a-target/config/sl-a.json",
+        "HTTP_PORT": "${SL_PORT:?}"
+      },
+      "networks": {
+        "swarm": {
+          "aliases": [
+            "sl-a.openswarm.internal"
+          ]
+        }
+      },
+      "image": "${IMAGE_NAMESPACE:?set namespace}/independent-sl:${SL_VERSION:?set explicit version}",
+      "entrypoint": [
+        "python",
+        "/deployment/bundle/sl-a-target/runtime/sl_entry.py"
+      ],
+      "command": [],
+      "depends_on": {
+        "bundle-init": {
+          "condition": "service_completed_successfully"
+        },
+        "sn": {
+          "condition": "service_healthy"
+        }
+      },
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "deployment",
+          "target": "/deployment",
+          "read_only": true
+        }
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ['HTTP_PORT']+'/v1/ml/session',timeout=2).read()"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "45s",
+        "retries": 18
+      }
+    },
+    "client-a": {
+      "platform": "linux/arm64",
+      "restart": "no",
+      "user": "65532:65532",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 256,
+      "cpus": 2,
+      "mem_limit": "2048m",
+      "stop_grace_period": "30s",
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      },
+      "tmpfs": [
+        "/tmp:rw,nosuid,nodev,size=134217728,uid=65532,gid=65532"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "/app",
+        "SWOP_CONFIG": "/deployment/bundle/sl-a-target/config/client-a.json",
+        "CUDA_VISIBLE_DEVICES": "-1",
+        "TF_NUM_INTRAOP_THREADS": "1",
+        "TF_NUM_INTEROP_THREADS": "1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "TF_ENABLE_ONEDNN_OPTS": "0"
+      },
+      "networks": [
+        "swarm"
+      ],
+      "image": "${IMAGE_NAMESPACE:?set namespace}/independent-user-tf:${USER_TF_VERSION:?set explicit version}",
+      "entrypoint": [
+        "python",
+        "/deployment/bundle/sl-a-target/runtime/user_entry.py"
+      ],
+      "command": [],
+      "healthcheck": {
+        "disable": true
+      },
+      "depends_on": {
+        "bundle-init": {
+          "condition": "service_completed_successfully"
+        },
+        "sl-a": {
+          "condition": "service_healthy"
+        }
+      },
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "deployment",
+          "target": "/deployment",
+          "read_only": true
+        },
+        {
+          "type": "volume",
+          "source": "checkpoint-a",
+          "target": "/tmp/checkpoints",
+          "read_only": false
+        }
+      ]
+    },
+    "sl-b": {
+      "platform": "linux/arm64",
+      "restart": "no",
+      "user": "65532:65532",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 256,
+      "cpus": 1,
+      "mem_limit": "512m",
+      "stop_grace_period": "30s",
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      },
+      "tmpfs": [
+        "/tmp:rw,nosuid,nodev,size=134217728,uid=65532,gid=65532"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "/app",
+        "SWOP_CONFIG": "/deployment/bundle/sl-b-target/config/sl-b.json",
+        "HTTP_PORT": "${SL_PORT:?}"
+      },
+      "networks": {
+        "swarm": {
+          "aliases": [
+            "sl-b.openswarm.internal"
+          ]
+        }
+      },
+      "image": "${IMAGE_NAMESPACE:?set namespace}/independent-sl:${SL_VERSION:?set explicit version}",
+      "entrypoint": [
+        "python",
+        "/deployment/bundle/sl-b-target/runtime/sl_entry.py"
+      ],
+      "command": [],
+      "depends_on": {
+        "bundle-init": {
+          "condition": "service_completed_successfully"
+        },
+        "sn": {
+          "condition": "service_healthy"
+        }
+      },
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "deployment",
+          "target": "/deployment",
+          "read_only": true
+        }
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ['HTTP_PORT']+'/v1/ml/session',timeout=2).read()"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "45s",
+        "retries": 18
+      }
+    },
+    "client-b": {
+      "platform": "linux/arm64",
+      "restart": "no",
+      "user": "65532:65532",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 256,
+      "cpus": 2,
+      "mem_limit": "2048m",
+      "stop_grace_period": "30s",
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      },
+      "tmpfs": [
+        "/tmp:rw,nosuid,nodev,size=134217728,uid=65532,gid=65532"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "/app",
+        "SWOP_CONFIG": "/deployment/bundle/sl-b-target/config/client-b.json",
+        "CUDA_VISIBLE_DEVICES": "-1",
+        "TF_NUM_INTRAOP_THREADS": "1",
+        "TF_NUM_INTEROP_THREADS": "1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "TF_ENABLE_ONEDNN_OPTS": "0"
+      },
+      "networks": [
+        "swarm"
+      ],
+      "image": "${IMAGE_NAMESPACE:?set namespace}/independent-user-tf:${USER_TF_VERSION:?set explicit version}",
+      "entrypoint": [
+        "python",
+        "/deployment/bundle/sl-b-target/runtime/user_entry.py"
+      ],
+      "command": [],
+      "healthcheck": {
+        "disable": true
+      },
+      "depends_on": {
+        "bundle-init": {
+          "condition": "service_completed_successfully"
+        },
+        "sl-b": {
+          "condition": "service_healthy"
+        }
+      },
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "deployment",
+          "target": "/deployment",
+          "read_only": true
+        },
+        {
+          "type": "volume",
+          "source": "checkpoint-b",
+          "target": "/tmp/checkpoints",
+          "read_only": false
+        }
+      ]
+    },
+    "round-controller": {
+      "platform": "linux/arm64",
+      "restart": "no",
+      "user": "65532:65532",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 64,
+      "cpus": 0.5,
+      "mem_limit": "128m",
+      "stop_grace_period": "30s",
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      },
+      "tmpfs": [
+        "/tmp:rw,nosuid,nodev,size=134217728,uid=65532,gid=65532"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "image": "${IMAGE_NAMESPACE:?set namespace}/independent-swop:${SWOP_VERSION:?set explicit version}",
+      "entrypoint": [
+        "python",
+        "-m",
+        "swop"
+      ],
+      "command": [
+        "orchestrate",
+        "/deployment/bundle/profile.json",
+        "--journal",
+        "/controller-data/rounds.jsonl",
+        "--exclusive-owner",
+        "--listen-host",
+        "0.0.0.0"
+      ],
+      "healthcheck": {
+        "disable": true
+      },
+      "network_mode": "service:sn",
+      "depends_on": {
+        "bundle-init": {
+          "condition": "service_completed_successfully"
+        },
+        "sn": {
+          "condition": "service_healthy"
+        },
+        "sl-a": {
+          "condition": "service_healthy"
+        },
+        "sl-b": {
+          "condition": "service_healthy"
+        }
+      },
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "deployment",
+          "target": "/deployment",
+          "read_only": true
+        },
+        {
+          "type": "volume",
+          "source": "controller-data",
+          "target": "/controller-data",
+          "read_only": false
+        }
+      ]
+    },
+    "verify": {
+      "platform": "linux/arm64",
+      "restart": "no",
+      "user": "65532:65532",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 64,
+      "cpus": 0.5,
+      "mem_limit": "128m",
+      "stop_grace_period": "30s",
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      },
+      "tmpfs": [
+        "/tmp:rw,nosuid,nodev,size=134217728,uid=65532,gid=65532"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "networks": [
+        "swarm"
+      ],
+      "image": "${IMAGE_NAMESPACE:?set namespace}/independent-swop:${SWOP_VERSION:?set explicit version}",
+      "profiles": [
+        "tools"
+      ],
+      "entrypoint": [
+        "python",
+        "/config/verify.py"
+      ],
+      "command": [],
+      "healthcheck": {
+        "disable": true
+      },
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "./config",
+          "target": "/config",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "volume",
+          "source": "deployment",
+          "target": "/deployment",
+          "read_only": true
+        },
+        {
+          "type": "volume",
+          "source": "controller-data",
+          "target": "/controller-data",
+          "read_only": true
+        },
+        {
+          "type": "volume",
+          "source": "checkpoint-a",
+          "target": "/checkpoint-a",
+          "read_only": true
+        },
+        {
+          "type": "volume",
+          "source": "checkpoint-b",
+          "target": "/checkpoint-b",
+          "read_only": true
+        }
+      ]
+    },
+    "verify-fedavg": {
+      "platform": "linux/arm64",
+      "restart": "no",
+      "user": "65532:65532",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 256,
+      "cpus": 2,
+      "mem_limit": "2048m",
+      "stop_grace_period": "30s",
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      },
+      "tmpfs": [
+        "/tmp:rw,nosuid,nodev,size=134217728,uid=65532,gid=65532"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "/app",
+        "CUDA_VISIBLE_DEVICES": "-1",
+        "TF_NUM_INTRAOP_THREADS": "1",
+        "TF_NUM_INTEROP_THREADS": "1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "TF_ENABLE_ONEDNN_OPTS": "0"
+      },
+      "image": "${IMAGE_NAMESPACE:?set namespace}/independent-user-tf:${USER_TF_VERSION:?set explicit version}",
+      "entrypoint": [
+        "python",
+        "/config/verify_fedavg.py"
+      ],
+      "command": [],
+      "healthcheck": {
+        "disable": true
+      },
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "./config",
+          "target": "/config",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "volume",
+          "source": "deployment",
+          "target": "/deployment",
+          "read_only": true
+        },
+        {
+          "type": "volume",
+          "source": "checkpoint-a",
+          "target": "/checkpoint-a",
+          "read_only": true
+        },
+        {
+          "type": "volume",
+          "source": "checkpoint-b",
+          "target": "/checkpoint-b",
+          "read_only": true
+        }
+      ],
+      "profiles": [
+        "tools"
+      ],
+      "network_mode": "none"
+    }
+  },
+  "networks": {
+    "swarm": {
+      "driver": "bridge",
+      "internal": true,
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      }
+    }
+  },
+  "volumes": {
+    "deployment": {
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      }
+    },
+    "checkpoint-a": {
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      }
+    },
+    "checkpoint-b": {
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      }
+    },
+    "controller-data": {
+      "labels": {
+        "io.openswarm.deployment.owner": "openswarm-deployment",
+        "io.openswarm.deployment.run": "${RUN_ID:?set fresh RUN_ID}",
+        "io.openswarm.deployment.contract": "single-pi-v1"
+      }
+    }
+  }
+}

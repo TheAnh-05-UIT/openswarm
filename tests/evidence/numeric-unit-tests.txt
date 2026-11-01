@@ -1,0 +1,7 @@
+test_multiple_shapes_and_unequal_counts (__main__.NumericReplayMathTests.test_multiple_shapes_and_unequal_counts) ... ok
+test_sample_weighted_arithmetic (__main__.NumericReplayMathTests.test_sample_weighted_arithmetic) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.425s
+
+OK

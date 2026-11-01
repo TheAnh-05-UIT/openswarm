@@ -1,0 +1,202 @@
+{
+  "schema_version": 2,
+  "profile_id": "pi-single",
+  "job_id": "set-by-initializer",
+  "hosts": [
+    {
+      "id": "sn-target",
+      "address": "sn.openswarm.internal",
+      "architecture": "linux/arm64",
+      "reserved_ports": [
+        22
+      ]
+    },
+    {
+      "id": "sl-a-target",
+      "address": "sl-a.openswarm.internal",
+      "architecture": "linux/arm64",
+      "reserved_ports": [
+        22
+      ]
+    },
+    {
+      "id": "sl-b-target",
+      "address": "sl-b.openswarm.internal",
+      "architecture": "linux/arm64",
+      "reserved_ports": [
+        22
+      ]
+    }
+  ],
+  "bootstrap": {
+    "path": "assets/initial.iutfw",
+    "sha256": "590525b9b37b66b74a21c492a910a27b30ca030d2d15bac64a1b4203ae314702",
+    "model": {
+      "features": 4,
+      "hidden": 8
+    }
+  },
+  "services": [
+    {
+      "id": "sn",
+      "role": "sn",
+      "host": "sn-target",
+      "image": "24520115/independent-sn:v0.1.0-arm64",
+      "port": 8000,
+      "published_port": 8000,
+      "params": {
+        "peer_ttl": 180
+      },
+      "resources": {
+        "cpus": 1,
+        "memory_mib": 512
+      }
+    },
+    {
+      "id": "sl-a",
+      "role": "sl",
+      "host": "sl-a-target",
+      "peer_id": "sl-a",
+      "image": "24520115/independent-sl:v0.1.0-arm64",
+      "port": 9000,
+      "published_port": 9000,
+      "params": {
+        "round_timeout": 600,
+        "request_timeout": 2,
+        "startup_timeout": 600
+      },
+      "resources": {
+        "cpus": 1,
+        "memory_mib": 512
+      }
+    },
+    {
+      "id": "sl-b",
+      "role": "sl",
+      "host": "sl-b-target",
+      "peer_id": "sl-b",
+      "image": "24520115/independent-sl:v0.1.0-arm64",
+      "port": 9000,
+      "published_port": 9000,
+      "params": {
+        "round_timeout": 600,
+        "request_timeout": 2,
+        "startup_timeout": 600
+      },
+      "resources": {
+        "cpus": 1,
+        "memory_mib": 512
+      }
+    },
+    {
+      "id": "client-a",
+      "role": "user_tf",
+      "host": "sl-a-target",
+      "sl": "sl-a",
+      "image": "24520115/independent-user-tf:v0.1.0-arm64",
+      "params": {
+        "samples": 16,
+        "data_seed": 100,
+        "model_seed": 11,
+        "epochs": 2,
+        "batch_size": 16,
+        "round_ids": [
+          1,
+          2
+        ],
+        "startup_timeout": 600,
+        "round_wait_timeout": 1200,
+        "training_timeout": 600
+      },
+      "resources": {
+        "cpus": 2,
+        "memory_mib": 2048
+      }
+    },
+    {
+      "id": "client-b",
+      "role": "user_tf",
+      "host": "sl-b-target",
+      "sl": "sl-b",
+      "image": "24520115/independent-user-tf:v0.1.0-arm64",
+      "params": {
+        "samples": 32,
+        "data_seed": 200,
+        "model_seed": 37,
+        "epochs": 2,
+        "batch_size": 16,
+        "round_ids": [
+          1,
+          2
+        ],
+        "startup_timeout": 600,
+        "round_wait_timeout": 1200,
+        "training_timeout": 600
+      },
+      "resources": {
+        "cpus": 2,
+        "memory_mib": 2048
+      }
+    }
+  ],
+  "deployment": {
+    "project_prefix": "openswarm",
+    "run_id": "20261101t000000z-007e0001",
+    "owner": "openswarm-deployment",
+    "swop_image": "24520115/independent-swop:v0.1.0-arm64",
+    "uid": 65532,
+    "gid": 65532,
+    "tool_resources": {
+      "cpus": 0.5,
+      "memory_mib": 128,
+      "pids_limit": 64
+    },
+    "hosts": [
+      {
+        "host": "sn-target",
+        "app_bind_ip": "192.0.2.10",
+        "memory_budget_mib": 6144,
+        "cpu_quota_budget": 9,
+        "checkpoint_root": "./data/checkpoints",
+        "swop_output": "./swop-output"
+      },
+      {
+        "host": "sl-a-target",
+        "app_bind_ip": "192.0.2.11",
+        "memory_budget_mib": 6144,
+        "cpu_quota_budget": 9,
+        "checkpoint_root": "./data/checkpoints",
+        "swop_output": "./swop-output"
+      },
+      {
+        "host": "sl-b-target",
+        "app_bind_ip": "192.0.2.12",
+        "memory_budget_mib": 6144,
+        "cpu_quota_budget": 9,
+        "checkpoint_root": "./data/checkpoints",
+        "swop_output": "./swop-output"
+      }
+    ]
+  },
+  "monitoring": {
+    "enabled": false
+  },
+  "orchestration": {
+    "enabled": true,
+    "host": "sn-target",
+    "port": 9200,
+    "published_port": 9200,
+    "exclusive_owner_acknowledged": true,
+    "startup_timeout": 600,
+    "round_timeout": 600,
+    "poll_interval": 0.5,
+    "request_timeout": 2,
+    "get_retries": 2,
+    "receipt_timeout": 30,
+    "resources": {
+      "cpus": 0.5,
+      "memory_mib": 128,
+      "pids_limit": 64
+    }
+  }
+}

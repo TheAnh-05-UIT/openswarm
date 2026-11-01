@@ -1,0 +1,93 @@
+{
+  "checked_utc": "2026-11-01T05:04:29.222074+00:00",
+  "method": "Read-only Registry v2 token/manifest/config HTTP; no Docker pull",
+  "images": [
+    {
+      "image": "24520115/independent-sn:v0.1.0-arm64",
+      "status": "PASS",
+      "expected_config": "sha256:2c426c892cf5da693f1b96ab2f77400c9970b08a6effde15dd8d8ae9dcaa5984",
+      "tag_digest": "sha256:d62b933b7119e285eac8cd7a88b2c5a2cc5c6ee0147d281efd87d483601aa93e",
+      "platform_manifest_digest": "sha256:a72e1faf9a415d11609a035eb146ce0b669b32b985294cda1b48d83a337afadb",
+      "config_digest": "sha256:2c426c892cf5da693f1b96ab2f77400c9970b08a6effde15dd8d8ae9dcaa5984",
+      "os": "linux",
+      "architecture": "arm64",
+      "entrypoint": [
+        "python",
+        "-m",
+        "sn_mvp"
+      ],
+      "cmd": [
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ],
+      "user": "65532:65532",
+      "accepted_image_match": true,
+      "reason": "Registry metadata/config identity only; no pull or runtime test"
+    },
+    {
+      "image": "24520115/independent-sl:v0.1.0-arm64",
+      "status": "PASS",
+      "expected_config": "sha256:ca0c22b20dbf220868ae9188a9c30c3f13db25f0dbffaf2eef00559813aa6eb9",
+      "tag_digest": "sha256:cafe850ee0c3982e9e8f08a3a5a31a283eb70b60e771267f6680fb414e2c4ed1",
+      "platform_manifest_digest": "sha256:aa8171c7a89de49d4e358ce98e0bac4be93fd7c2c3e4e4b3e9ce46863d740a70",
+      "config_digest": "sha256:ca0c22b20dbf220868ae9188a9c30c3f13db25f0dbffaf2eef00559813aa6eb9",
+      "os": "linux",
+      "architecture": "arm64",
+      "entrypoint": [
+        "python",
+        "-m",
+        "sl_runtime"
+      ],
+      "cmd": [
+        "--help"
+      ],
+      "user": "65532:65532",
+      "accepted_image_match": true,
+      "reason": "Registry metadata/config identity only; no pull or runtime test"
+    },
+    {
+      "image": "24520115/independent-user-tf:v0.1.0-arm64",
+      "status": "PASS",
+      "expected_config": "sha256:7e2edf5051b0bc03259de61c59d1d3775bd196c3f4a82cdf4a1b4f5c0a9fc16b",
+      "tag_digest": "sha256:ad56cea69480a02574b5809c496dcfeca77d584b231df99154590b099cf55719",
+      "platform_manifest_digest": "sha256:8bcd33d4473967a55f69055b2a3e1af1d822ade4832bae5ee86a2cc36d41d753",
+      "config_digest": "sha256:7e2edf5051b0bc03259de61c59d1d3775bd196c3f4a82cdf4a1b4f5c0a9fc16b",
+      "os": "linux",
+      "architecture": "arm64",
+      "entrypoint": [
+        "python",
+        "-m",
+        "user_tf"
+      ],
+      "cmd": [
+        "--help"
+      ],
+      "user": "65532:65532",
+      "accepted_image_match": true,
+      "reason": "Registry metadata/config identity only; no pull or runtime test"
+    },
+    {
+      "image": "24520115/independent-swop:v0.1.0-arm64",
+      "status": "PASS",
+      "expected_config": "sha256:d2810148d8142ac7f679e4f263534643a36b8020560dde66309de7e5128284e5",
+      "tag_digest": "sha256:908bc2b2ae9fa40b1ab821a106709e954b1515322160755708bccc6852ab3aef",
+      "platform_manifest_digest": "sha256:10b7d303d71c06c8aad2951008adc3f63a7a7f231922faa2cf05675cf60bbaf8",
+      "config_digest": "sha256:d2810148d8142ac7f679e4f263534643a36b8020560dde66309de7e5128284e5",
+      "os": "linux",
+      "architecture": "arm64",
+      "entrypoint": [
+        "python",
+        "-m",
+        "swop"
+      ],
+      "cmd": [
+        "--help"
+      ],
+      "user": "65532:65532",
+      "accepted_image_match": true,
+      "reason": "Registry metadata/config identity only; no pull or runtime test"
+    }
+  ]
+}
