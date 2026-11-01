@@ -27,6 +27,7 @@
       "environment": {
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "/app",
         "IMAGE_NAMESPACE": "${IMAGE_NAMESPACE:?set IMAGE_NAMESPACE}",
         "SN_VERSION": "${SN_VERSION:?set SN_VERSION}",
         "SL_VERSION": "${SL_VERSION:?set SL_VERSION}",
@@ -549,7 +550,8 @@
       ],
       "environment": {
         "PYTHONDONTWRITEBYTECODE": "1",
-        "PYTHONUNBUFFERED": "1"
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "/app"
       },
       "networks": [
         "swarm"
