@@ -1,7 +1,7 @@
-"""Deployment-only glue. Run in the SWOP image, never install SWOP on the host.
+"""Chuẩn bị cấu hình triển khai bên trong image SWOP, không cài SWOP lên host.
 
-Uses that image's generator and launchers; this repository contains no ML/runtime
-implementation. All writable mounts must be NEW project-owned named volumes.
+Dùng bộ sinh cấu hình và launcher có sẵn trong image; repo không chứa mã ML.
+Chỉ ghi vào các named volume MỚI thuộc project đang được khởi tạo.
 """
 import hashlib
 import json
@@ -27,7 +27,7 @@ def number(env, name, low, high, decimal=False):
     return value
 
 def make_profile(template, env):
-    """Restrict this deploy contract to two small rounds; all checks are offline."""
+    """Giới hạn cấu hình ở hai round nhỏ; chỉ kiểm tra dữ liệu cục bộ."""
     data = json.loads(json.dumps(template))
     require(bool(re.fullmatch(RUN_PATTERN, env['RUN_ID'])), 'RUN_ID must be UTC timestamp + eight hex characters')
     require(env['EXCLUSIVE_OWNER_ACK'] == 'true', 'A single trusted round writer must be acknowledged')
@@ -72,13 +72,13 @@ def encoded(data):
     return (json.dumps(data, sort_keys=True, indent=2, allow_nan=False) + '\n').encode()
 
 def prepare_mounts(roots=ROOTS):
-    """No recursive chown, overwrite, deletion, or access outside fixed mounts."""
+    """Không chown đệ quy, ghi đè, xóa hoặc truy cập ngoài các mount đã định."""
     for root in map(Path, roots):
         require(root.is_dir() and not root.is_symlink(), 'Required named volume missing: ' + str(root))
         require(not any(root.iterdir()), 'Volume not empty; refuse reuse: ' + str(root))
     require(os.getuid() == 0, 'Bootstrap requires narrowly scoped root privileges on NEW named volumes only')
     for root in map(Path, roots):
-        # Fresh volume root is root-owned: chmod before relinquishing ownership.
+        # Volume mới thuộc root: đặt quyền trước khi chuyển chủ sở hữu.
         os.chmod(root, 0o700)
         os.chown(root, UID, GID)
     os.setgroups([])
@@ -104,7 +104,7 @@ def generate(data, asset, target):
             cfg = json.loads(files[name])
             cfg['initial_weights'] = str(target / 'assets/initial.iutfw')
             files[name] = encoded(cfg)
-    # Reflect configuration-only path adaptation in the generated inventory.
+    # Cập nhật inventory theo các đường dẫn cấu hình đã chuyển đổi.
     manifest = json.loads(files['deployment-manifest.json'])
     manifest['payload_files'] = [{'path': p, 'bytes': len(b), 'sha256': hashlib.sha256(b).hexdigest()}
                          for p, b in sorted(files.items()) if p != 'deployment-manifest.json']
@@ -114,10 +114,10 @@ def generate(data, asset, target):
 
 def main():
     config = Path(__file__).resolve().parent
-    data = make_profile(json.loads((config / 'profile.template.json').read_text()), os.environ)
+    data = make_profile(json.loads((config / 'profile.template.json').read_text(encoding='utf-8')), os.environ)
     raw = (config / 'assets/initial.iutfw').read_bytes()
     require(hashlib.sha256(raw).hexdigest() == ASSET_SHA, 'Numeric bootstrap SHA-256 mismatch')
-    # Validate schema/relationships before touching writable volumes.
+    # Kiểm tra schema và quan hệ cấu hình trước khi ghi vào volume mới.
     from swop.profile import validate
     validate(data)
     prepare_mounts()

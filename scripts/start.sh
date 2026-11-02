@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
+# Pull image và chạy một job single-host MỚI; giữ nguyên job/tài nguyên cũ.
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/common.sh"
 load_settings
 check_engine
 dc config --quiet
-# A run is a fresh job, never implicit recovery of memory-only SN/SL state.
+# Mỗi lần chạy là job mới; không tự khôi phục trạng thái SN/SL chỉ nằm trong RAM.
 for kind in container network volume; do
   args=()
   [[ "$kind" != container ]] || args+=(--all)

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Replay training nhỏ để kiểm chứng FedAvg; không upload model hoặc mở round.
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/common.sh"
 load_settings

@@ -270,7 +270,9 @@
         "OMP_NUM_THREADS": "1",
         "OPENBLAS_NUM_THREADS": "1",
         "MKL_NUM_THREADS": "1",
-        "TF_ENABLE_ONEDNN_OPTS": "0"
+        "TF_ENABLE_ONEDNN_OPTS": "0",
+        "HOME": "/tmp",
+        "KERAS_HOME": "/tmp/.keras"
       },
       "networks": [
         "swarm"
@@ -413,7 +415,9 @@
         "OMP_NUM_THREADS": "1",
         "OPENBLAS_NUM_THREADS": "1",
         "MKL_NUM_THREADS": "1",
-        "TF_ENABLE_ONEDNN_OPTS": "0"
+        "TF_ENABLE_ONEDNN_OPTS": "0",
+        "HOME": "/tmp",
+        "KERAS_HOME": "/tmp/.keras"
       },
       "networks": [
         "swarm"
@@ -637,7 +641,9 @@
         "OMP_NUM_THREADS": "1",
         "OPENBLAS_NUM_THREADS": "1",
         "MKL_NUM_THREADS": "1",
-        "TF_ENABLE_ONEDNN_OPTS": "0"
+        "TF_ENABLE_ONEDNN_OPTS": "0",
+        "HOME": "/tmp",
+        "KERAS_HOME": "/tmp/.keras"
       },
       "image": "${IMAGE_NAMESPACE:?set namespace}/independent-user-tf:${USER_TF_VERSION:?set explicit version}",
       "entrypoint": [

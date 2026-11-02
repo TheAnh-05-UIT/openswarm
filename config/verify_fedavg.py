@@ -1,8 +1,8 @@
-"""Optional bounded numeric replay in User-TF, after the real clients exit.
+"""Replay số học có giới hạn trong User-TF, sau khi hai client đã kết thúc.
 
-Replays local training from recorded inputs and previous GLOBAL checkpoints,
-then independently calculates sample-weighted numpy float64 FedAvg. Does not
-contact/mutate SN/SL, upload models, start rounds, or write checkpoints.
+Huấn luyện lại từ cấu hình và global checkpoint đã lưu, rồi tính FedAvg độc lập
+bằng NumPy float64, có trọng số theo số mẫu. Không gọi hoặc sửa SN/SL, không
+upload mô hình, mở round hay ghi lại checkpoint. Replay vẫn có tính toán ML.
 """
 import json
 from pathlib import Path
@@ -19,7 +19,7 @@ def main():
     from user_tf.spec import ModelSpec
     from user_tf.weights import deserialize
     root = Path('/deployment/bundle')
-    profile = json.loads((root / 'profile.json').read_text())
+    profile = json.loads((root / 'profile.json').read_text(encoding='utf-8'))
     spec = ModelSpec(**profile['bootstrap']['model'])
     bootstrap = deserialize((root / 'assets/initial.iutfw').read_bytes(), spec).weights
     clients = sorted((s for s in profile['services'] if s['role'] == 'user_tf'), key=lambda s: s['id'])
@@ -27,7 +27,7 @@ def main():
     for rid in (1, 2):
         updates = []
         for suffix, service in zip(('a', 'b'), clients):
-            cfg = json.loads((root / service['host'] / 'config' / (service['id'] + '.json')).read_text())
+            cfg = json.loads((root / service['host'] / 'config' / (service['id'] + '.json')).read_text(encoding='utf-8'))
             p = cfg['params']
             base = bootstrap if rid == 1 else deserialize(Path('/checkpoint-' + suffix + '/round-1.iutfw').read_bytes(), spec).weights
             trainer = LocalTrainer(spec=spec, seed=p['model_seed'], learning_rate=p['learning_rate'])

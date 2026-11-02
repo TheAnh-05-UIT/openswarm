@@ -1,4 +1,4 @@
-"""Read-only run evidence verification in the SWOP image; no Docker API access."""
+"""Đọc và xác minh bằng chứng của job trong image SWOP; không gọi Docker API."""
 import hashlib
 import json
 from pathlib import Path
@@ -10,7 +10,7 @@ def require(ok, message):
         raise ValueError(message)
 
 def read_json(path):
-    return json.loads(Path(path).read_text())
+    return json.loads(Path(path).read_text(encoding='utf-8'))
 
 def bounded(path, limit):
     with Path(path).open('rb') as stream:
@@ -66,7 +66,7 @@ def inspect_journal(events, profile, bootstrap):
     return completed, receipts, epoch, model
 
 def get(url):
-    # URLs are fixed by the generated, validated profile, not untrusted redirects.
+    # URL lấy từ profile đã kiểm tra; không nhận URL tùy ý từ dữ liệu bên ngoài.
     with urllib.request.urlopen(url, timeout=5) as response:
         raw = response.read(131073)
     require(len(raw) <= 131072, 'HTTP response exceeds bound')

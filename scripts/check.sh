@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Kiểm tra cấu hình, local Engine và Compose; không khởi động job.
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/common.sh"
 load_settings

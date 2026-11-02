@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Literal .env reader: never source/eval user-controlled input.
+# Hàm dùng chung: đọc env dạng literal, ràng buộc project và kiểm tra Engine local.
+# Đọc .env dạng literal; không source/eval dữ liệu do người dùng nhập.
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -41,13 +42,13 @@ load_settings() {
     (( ((value + BATCH_SIZE - 1) / BATCH_SIZE) * EPOCHS <= 1024 )) || die 'User-TF supports at most 1024 minibatch updates per round.'
   done
   PROJECT="openswarm-$RUN_ID"
-  # Explicit args plus removal of inherited Compose overrides prevent accidental reuse.
+  # Dùng tham số tường minh, bỏ biến Compose kế thừa để tránh nhắm nhầm project.
   unset COMPOSE_PROJECT_NAME COMPOSE_FILE COMPOSE_PROFILES COMPOSE_REMOVE_ORPHANS COMPOSE_ENV_FILES
   export COMPOSE_REMOVE_ORPHANS=0
   [[ -r "$ROOT/config/initialize.py" && -r "$ROOT/config/profile.template.json" && -r "$ROOT/config/assets/initial.iutfw" && -r "$ROOT/config/verify.py" && -r "$ROOT/config/verify_fedavg.py" ]] || die 'Incomplete deployment repository.'
   (cd "$ROOT" && printf '%s  %s\n' 590525b9b37b66b74a21c492a910a27b30ca030d2d15bac64a1b4203ae314702 config/assets/initial.iutfw | sha256sum --check --status) || die 'Numeric bootstrap checksum mismatch.'
-  # These four images require no static secret. SN ownership tokens are generated
-  # in memory and never put in .env or logs; secrets/ is reserved and unused.
+  # Bốn image không yêu cầu static secret. SN tự sinh token sở hữu peer
+  # trong bộ nhớ; không đưa vào .env/log. secrets/ hiện chỉ là chỗ dự phòng.
 }
 check_integer() {
   local value=${!1}
