@@ -1,5 +1,7 @@
 # OpenSwarm Independent — ARM64 Docker Deployment
 
+> Operator xác nhận native ARM64 single-host PASS riêng trên Raspberry Pi 5 và Orange Pi 5 Pro, gồm hai rounds và cả hai verifiers. Raw evidence còn cần lưu bổ sung; xem [kế hoạch bằng chứng](research-evidence.md). Đây không phải xác nhận training multi-host. Monitoring bị chặn phát hành riêng, không thay đổi trạng thái bốn image đã publish và được sử dụng thành công.
+
 Triển khai **OpenSwarm Independent** trên **Raspberry Pi 5** hoặc **Orange Pi 5 Pro** bằng Docker Compose, sử dụng các Docker image đã được build sẵn trên Docker Hub.
 
 Repository này dành cho người muốn **clone, cấu hình và chạy thử một phiên huấn luyện FedAvg gồm 2 rounds** mà không cần tự build image hoặc cài Python/TensorFlow trên máy host.
@@ -27,7 +29,7 @@ Cấu hình mặc định: **2 rounds**, Client-A **16 samples**, Client-B **32 
 | [`24520115/independent-user-tf`](https://hub.docker.com/r/24520115/independent-user-tf) | `v0.1.0-arm64` | `linux/arm64` |
 | [`24520115/independent-swop`](https://hub.docker.com/r/24520115/independent-swop) | `v0.1.0-arm64` | `linux/arm64` |
 
-Đây là các tag đã được kiểm thử trên Raspberry Pi 5 và Orange Pi 5 Pro. Thông tin nhận dạng image tại thời điểm kiểm tra được lưu trong [`tests/evidence/registry-status.json`](tests/evidence/registry-status.json). Để tái lập chính xác bằng chứng cũ, đối chiếu image digest; không coi tag là bất biến.
+Đây là các tag đã được kiểm thử trên Raspberry Pi 5 và Orange Pi 5 Pro. Thông tin nhận dạng image tại thời điểm kiểm tra được lưu trong [`config/image-manifest.json`](../config/image-manifest.json). Để tái lập chính xác bằng chứng cũ, đối chiếu image digest; không coi tag là bất biến.
 
 ## 2. Yêu cầu trước khi triển khai
 
@@ -57,7 +59,7 @@ df -h /
 
 > **Lưu ý:** Docker phải truy cập được bằng tài khoản hiện tại. Không sử dụng Docker context trỏ tới Windows hoặc máy khác để chứng minh chạy native ARM64 trên Pi.
 
-## 3. Quick Start — Clone và chạy OpenSwarm
+## 3. Clone và chạy OpenSwarm
 
 Các lệnh dưới đây chạy trên **terminal của Raspberry Pi 5 hoặc Orange Pi 5 Pro**,
 
@@ -73,7 +75,7 @@ Nếu đã clone từ trước, vào thư mục `~/openswarm`, kiểm tra thay �
 ### Bước 2 — Tạo file cấu hình `.env`
 
 ```bash
-cp .env.example .env
+cp -n .env.example .env
 ```
 
 Tạo một `RUN_ID` mới và tự điền vào `.env`:
@@ -215,8 +217,8 @@ openswarm/
 │   ├── verify.sh                 # Kiểm tra kết quả training
 │   ├── verify-fedavg.sh          # Replay số học FedAvg
 │   └── stop.sh                   # Dừng containers, giữ dữ liệu
-├── docs/                         # Tài liệu kỹ thuật và nghiệm thu
-├── tests/                        # Kiểm thử và evidence
+├── docs/                         # Hướng dẫn tiếng Việt theo chức năng
+├── tests/                        # Kiểm thử; output phát sinh bị Git bỏ qua
 └── secrets/                      # Thư mục dự phòng, chưa dùng static secret
 ```
 
@@ -246,7 +248,7 @@ Source ứng dụng không cần có trên Pi; các runtime liên quan được 
 
 Docker Compose sử dụng network nội bộ cho lab; không publish các API điều phối/training ra Internet.
 
-Thông tin chi tiết cho người phát triển nằm trong [`docs/`](docs/) và kết quả kiểm tra image trong [`tests/evidence/`](tests/evidence/).
+Người phát triển đọc [development.md](development.md); nhận dạng image đã lưu nằm trong [image-manifest.json](../config/image-manifest.json). Kết quả tests mới chỉ lưu tại máy, không cần đưa lên GitHub.
 
 ---
 
@@ -255,7 +257,7 @@ Thông tin chi tiết cho người phát triển nằm trong [`docs/`](docs/) v�
 ```bash
 git clone https://github.com/TheAnh-05-UIT/openswarm.git
 cd openswarm
-cp .env.example .env
+cp -n .env.example .env
 RUN_ID="$(date -u +%Y%m%dt%H%M%Sz)-$(od -An -N4 -tx1 /dev/urandom | tr -d '[:space:]')"
 sed -i "s/^RUN_ID=.*/RUN_ID=$RUN_ID/" .env
 # Chỉ bật acknowledgement nếu chắc chắn có một round writer:
