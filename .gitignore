@@ -1,4 +1,5 @@
-﻿.env
+# Cấu hình riêng, khóa và thông tin xác thực không được đưa lên GitHub.
+.env
 .env.*
 !.env.example
 secrets/*
@@ -6,11 +7,13 @@ secrets/*
 *.pem
 *.key
 credentials*
+# Dữ liệu phát sinh khi vận hành hoặc kiểm thử, không phải mã nguồn.
 checkpoints/
 data/
 runtime/
 logs/
 *.log
+# Cache, file biên dịch và file tạm của trình soạn thảo.
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -21,5 +24,8 @@ tests/tmp/
 *.swp
 .DS_Store
 
-tests/evidence/docker-before.json
-tests/evidence/docker-after.json
+work/
+tests/evidence/
+multihost/evidence*/
+
+# Giữ hai bootstrap trong config/assets/ và multihost/assets/ để clone xong có thể dùng.
