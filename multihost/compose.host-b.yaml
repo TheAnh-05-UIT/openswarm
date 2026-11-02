@@ -1,0 +1,123 @@
+name: osm009-${RUN_ID:?set RUN_ID}-opi5-pro
+# Host B: SL-B và Client-B; không chạy SN/controller hoặc DNS xuyên host.
+
+x-labels: &labels
+  io.openswarm.rebuild.project: osm009
+  io.openswarm.rebuild.owner: openswarm-multihost
+  io.openswarm.rebuild.run: ${RUN_ID:?set RUN_ID}
+  io.openswarm.rebuild.host: opi5-pro
+  io.openswarm.bundle: ${BUNDLE_ID:?set pinned bundle ID}
+
+x-python: &python
+  PYTHONPATH: /app
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
+  HOME: /tmp
+
+# App chạy non-root, rootfs chỉ đọc; /tmp là vùng ghi tạm có giới hạn.
+x-runtime: &runtime
+  platform: linux/arm64
+  user: "65532:65532"
+  restart: "no"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  networks: [lab]
+  pids_limit: 256
+  stop_grace_period: 30s
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,size=134217728,uid=65532,gid=65532
+
+services:
+  sl-b:
+    <<: *runtime
+    image: ${SL_IMAGE:?set canonical SL image}
+    cpus: ${SL_B_CPUS:?}
+    mem_limit: ${SL_B_MEMORY:?}
+    labels:
+      <<: *labels
+      io.openswarm.rebuild.role: sl-b
+    environment:
+      <<: *python
+      SWOP_CONFIG: /config/service.json
+      HTTP_PORT: ${SL_B_PORT:?}
+    entrypoint: [python, /swop-runtime/sl_entry.py]
+    command: []
+    ports:
+      - target: ${SL_B_PORT:?}
+        published: "${SL_B_HOST_PORT:?}"
+        host_ip: ${HOST_B_IP:?set approved private IPv4}
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/runtime
+        target: /swop-runtime
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/config/sl-b.json
+        target: /config/service.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/assets/initial.iutfw
+        target: /assets/initial.iutfw
+        read_only: true
+        bind: {create_host_path: false}
+    healthcheck:
+      test: [CMD, python, -c, "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ['HTTP_PORT']+'/v1/ml/session',timeout=2).read()"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
+
+  client-b:
+    <<: *runtime
+    profiles: [training]
+    image: ${USER_TF_IMAGE:?set canonical User-TF image}
+    cpus: ${CLIENT_B_CPUS:?}
+    mem_limit: ${CLIENT_B_MEMORY:?}
+    labels:
+      <<: *labels
+      io.openswarm.rebuild.role: client-b
+    environment:
+      <<: *python
+      SWOP_CONFIG: /config/service.json
+      CUDA_VISIBLE_DEVICES: "-1"
+      TF_NUM_INTRAOP_THREADS: "1"
+      TF_NUM_INTEROP_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      TF_ENABLE_ONEDNN_OPTS: "0"
+      KERAS_HOME: /tmp/.keras
+    entrypoint: [python, /swop-runtime/user_entry.py]
+    command: []
+    healthcheck: {disable: true}
+    depends_on:
+      sl-b:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/runtime
+        target: /swop-runtime
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/config/client-b.json
+        target: /config/service.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/data/checkpoints/client-b
+        target: /tmp/checkpoints
+        bind: {create_host_path: false}
+
+# Bridge riêng mỗi Engine, có egress; không tạo overlay giữa hai host.
+networks:
+  lab:
+    driver: bridge
+    internal: false
+    labels:
+      <<: *labels
+      io.openswarm.rebuild.role: network-lab

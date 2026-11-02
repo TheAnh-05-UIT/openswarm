@@ -1,0 +1,186 @@
+{
+  "schema_version": 2,
+  "profile_id": "two-host-fedavg",
+  "job_id": "mh-",
+  "hosts": [
+    {
+      "id": "rpi5",
+      "address": "",
+      "architecture": "linux/arm64",
+      "reserved_ports": [
+        22
+      ]
+    },
+    {
+      "id": "opi5-pro",
+      "address": "",
+      "architecture": "linux/arm64",
+      "reserved_ports": [
+        22
+      ]
+    }
+  ],
+  "bootstrap": {
+    "path": "assets/initial.iutfw",
+    "sha256": "590525b9b37b66b74a21c492a910a27b30ca030d2d15bac64a1b4203ae314702",
+    "model": {
+      "features": 4,
+      "hidden": 8
+    }
+  },
+  "services": [
+    {
+      "id": "sn",
+      "role": "sn",
+      "host": "rpi5",
+      "image": "24520115/independent-sn:v0.1.0-arm64",
+      "port": 8000,
+      "published_port": 18000,
+      "params": {
+        "peer_ttl": 180
+      },
+      "resources": {
+        "cpus": 1,
+        "memory_mib": 512
+      }
+    },
+    {
+      "id": "sl-a",
+      "role": "sl",
+      "host": "rpi5",
+      "peer_id": "sl-a",
+      "image": "24520115/independent-sl:v0.1.0-arm64",
+      "port": 9000,
+      "published_port": 19001,
+      "params": {
+        "round_timeout": 600,
+        "request_timeout": 2,
+        "startup_timeout": 600
+      },
+      "resources": {
+        "cpus": 1,
+        "memory_mib": 512
+      }
+    },
+    {
+      "id": "sl-b",
+      "role": "sl",
+      "host": "opi5-pro",
+      "peer_id": "sl-b",
+      "image": "24520115/independent-sl:v0.1.0-arm64",
+      "port": 9000,
+      "published_port": 19002,
+      "params": {
+        "round_timeout": 600,
+        "request_timeout": 2,
+        "startup_timeout": 600
+      },
+      "resources": {
+        "cpus": 1,
+        "memory_mib": 512
+      }
+    },
+    {
+      "id": "client-a",
+      "role": "user_tf",
+      "host": "rpi5",
+      "sl": "sl-a",
+      "image": "24520115/independent-user-tf:v0.1.0-arm64",
+      "params": {
+        "samples": 16,
+        "data_seed": 100,
+        "model_seed": 11,
+        "epochs": 2,
+        "batch_size": 16,
+        "round_ids": [
+          1,
+          2
+        ],
+        "startup_timeout": 600,
+        "round_wait_timeout": 1200,
+        "training_timeout": 600
+      },
+      "resources": {
+        "cpus": 2,
+        "memory_mib": 2048
+      }
+    },
+    {
+      "id": "client-b",
+      "role": "user_tf",
+      "host": "opi5-pro",
+      "sl": "sl-b",
+      "image": "24520115/independent-user-tf:v0.1.0-arm64",
+      "params": {
+        "samples": 32,
+        "data_seed": 200,
+        "model_seed": 37,
+        "epochs": 2,
+        "batch_size": 16,
+        "round_ids": [
+          1,
+          2
+        ],
+        "startup_timeout": 600,
+        "round_wait_timeout": 1200,
+        "training_timeout": 600
+      },
+      "resources": {
+        "cpus": 2,
+        "memory_mib": 2048
+      }
+    }
+  ],
+  "deployment": {
+    "project_prefix": "osm009",
+    "run_id": "",
+    "owner": "openswarm-multihost",
+    "swop_image": "24520115/independent-swop:v0.1.0-arm64",
+    "uid": 65532,
+    "gid": 65532,
+    "tool_resources": {
+      "cpus": 0.5,
+      "memory_mib": 128,
+      "pids_limit": 64
+    },
+    "hosts": [
+      {
+        "host": "rpi5",
+        "app_bind_ip": "",
+        "memory_budget_mib": 6144,
+        "cpu_quota_budget": 9,
+        "checkpoint_root": "./data/checkpoints",
+        "swop_output": "./swop-output"
+      },
+      {
+        "host": "opi5-pro",
+        "app_bind_ip": "",
+        "memory_budget_mib": 6144,
+        "cpu_quota_budget": 9,
+        "checkpoint_root": "./data/checkpoints",
+        "swop_output": "./swop-output"
+      }
+    ]
+  },
+  "monitoring": {
+    "enabled": false
+  },
+  "orchestration": {
+    "enabled": true,
+    "host": "rpi5",
+    "port": 9200,
+    "published_port": 19200,
+    "exclusive_owner_acknowledged": true,
+    "startup_timeout": 600,
+    "round_timeout": 600,
+    "poll_interval": 0.5,
+    "request_timeout": 2,
+    "get_retries": 2,
+    "receipt_timeout": 30,
+    "resources": {
+      "cpus": 0.5,
+      "memory_mib": 128,
+      "pids_limit": 64
+    }
+  }
+}

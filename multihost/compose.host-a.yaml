@@ -1,0 +1,186 @@
+name: osm009-${RUN_ID:?set RUN_ID}-rpi5
+# Host A: SN, SL-A, Client-A và một controller; chỉ bind private host IP.
+
+x-labels: &labels
+  io.openswarm.rebuild.project: osm009
+  io.openswarm.rebuild.owner: openswarm-multihost
+  io.openswarm.rebuild.run: ${RUN_ID:?set RUN_ID}
+  io.openswarm.rebuild.host: rpi5
+  io.openswarm.bundle: ${BUNDLE_ID:?set pinned bundle ID}
+
+x-python: &python
+  PYTHONPATH: /app
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
+  HOME: /tmp
+
+# App chạy non-root, rootfs chỉ đọc; /tmp là vùng ghi tạm có giới hạn.
+x-runtime: &runtime
+  platform: linux/arm64
+  user: "65532:65532"
+  restart: "no"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  networks: [lab]
+  pids_limit: 256
+  stop_grace_period: 30s
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,size=134217728,uid=65532,gid=65532
+
+services:
+  sn:
+    <<: *runtime
+    image: ${SN_IMAGE:?set canonical SN image}
+    cpus: ${SN_CPUS:?}
+    mem_limit: ${SN_MEMORY:?}
+    labels:
+      <<: *labels
+      io.openswarm.rebuild.role: sn
+    environment:
+      <<: *python
+      HTTP_PORT: ${SN_PORT:?}
+    entrypoint: [python, -m, sn_mvp]
+    command: [--host, 0.0.0.0, --port, "${SN_PORT:?}", --peer-ttl, "${PEER_TTL:?}"]
+    ports:
+      - target: ${SN_PORT:?}
+        published: "${SN_HOST_PORT:?}"
+        host_ip: ${HOST_A_IP:?set approved private IPv4}
+        protocol: tcp
+    healthcheck:
+      test: [CMD, python, -c, "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ['HTTP_PORT']+'/health',timeout=2).read()"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
+
+  sl-a:
+    <<: *runtime
+    image: ${SL_IMAGE:?set canonical SL image}
+    cpus: ${SL_A_CPUS:?}
+    mem_limit: ${SL_A_MEMORY:?}
+    labels:
+      <<: *labels
+      io.openswarm.rebuild.role: sl-a
+    environment:
+      <<: *python
+      SWOP_CONFIG: /config/service.json
+      HTTP_PORT: ${SL_A_PORT:?}
+    entrypoint: [python, /swop-runtime/sl_entry.py]
+    command: []
+    depends_on:
+      sn:
+        condition: service_healthy
+    ports:
+      - target: ${SL_A_PORT:?}
+        published: "${SL_A_HOST_PORT:?}"
+        host_ip: ${HOST_A_IP:?}
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/runtime
+        target: /swop-runtime
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/config/sl-a.json
+        target: /config/service.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/assets/initial.iutfw
+        target: /assets/initial.iutfw
+        read_only: true
+        bind: {create_host_path: false}
+    healthcheck:
+      test: [CMD, python, -c, "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ['HTTP_PORT']+'/v1/ml/session',timeout=2).read()"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
+
+  client-a:
+    <<: *runtime
+    profiles: [training]
+    image: ${USER_TF_IMAGE:?set canonical User-TF image}
+    cpus: ${CLIENT_A_CPUS:?}
+    mem_limit: ${CLIENT_A_MEMORY:?}
+    labels:
+      <<: *labels
+      io.openswarm.rebuild.role: client-a
+    environment:
+      <<: *python
+      SWOP_CONFIG: /config/service.json
+      CUDA_VISIBLE_DEVICES: "-1"
+      TF_NUM_INTRAOP_THREADS: "1"
+      TF_NUM_INTEROP_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      TF_ENABLE_ONEDNN_OPTS: "0"
+      KERAS_HOME: /tmp/.keras
+    entrypoint: [python, /swop-runtime/user_entry.py]
+    command: []
+    healthcheck: {disable: true}
+    depends_on:
+      sl-a:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/runtime
+        target: /swop-runtime
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/config/client-a.json
+        target: /config/service.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/data/checkpoints/client-a
+        target: /tmp/checkpoints
+        bind: {create_host_path: false}
+
+  round-controller:
+    <<: *runtime
+    profiles: [controller]
+    image: ${SWOP_IMAGE:?set canonical SWOP image}
+    cpus: ${CONTROLLER_CPUS:?}
+    mem_limit: ${CONTROLLER_MEMORY:?}
+    pids_limit: 64
+    labels:
+      <<: *labels
+      io.openswarm.rebuild.role: round-controller
+    environment: *python
+    entrypoint: [python, -m, swop]
+    command: [orchestrate, /profiles/profile.json, --journal, /output/rounds.jsonl, --exclusive-owner, --listen-host, 0.0.0.0]
+    healthcheck: {disable: true}
+    depends_on:
+      sn:
+        condition: service_healthy
+      sl-a:
+        condition: service_healthy
+    ports:
+      - target: ${CONTROLLER_PORT:?}
+        published: "${CONTROLLER_HOST_PORT:?}"
+        host_ip: ${HOST_A_IP:?}
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/profiles
+        target: /profiles
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${JOB_ROOT:?}/deployment/swop-output
+        target: /output
+        bind: {create_host_path: false}
+
+# Bridge riêng mỗi Engine, có egress; không tạo overlay giữa hai host.
+networks:
+  lab:
+    driver: bridge
+    internal: false
+    labels:
+      <<: *labels
+      io.openswarm.rebuild.role: network-lab

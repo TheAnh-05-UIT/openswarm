@@ -1,0 +1,7 @@
+# Cấu hình job, cache và kết quả kiểm thử chỉ dùng tại máy.
+work/
+tests/tmp/
+__pycache__/
+*.py[cod]
+*.log
+evidence*/
