@@ -1,4 +1,4 @@
-"""Read-only snapshot of IDs/states; no env, command strings or credentials."""
+"""Chụp ID/trạng thái Docker ở chế độ chỉ đọc; không thu env hay credentials."""
 import datetime
 import json
 from pathlib import Path
@@ -20,12 +20,13 @@ if __name__ == '__main__':
               'networks': sorted(read('network', 'ls', '--no-trunc', '--format', '{{.ID}}')),
               'volumes': sorted(read('volume', 'ls', '--quiet'))}
     folder = Path(__file__).parent / 'evidence'
-    (folder / ('docker-' + mode + '.json')).write_text(json.dumps(result, indent=2) + '\n')
+    folder.mkdir(exist_ok=True)
+    (folder / ('docker-' + mode + '.json')).write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     print({key: len(result[key]) for key in ['containers', 'images', 'networks', 'volumes']})
     if mode == 'after':
-        before = json.loads((folder / 'docker-before.json').read_text())
+        before = json.loads((folder / 'docker-before.json').read_text(encoding='utf-8'))
         changes = [key for key in ['context', 'engine', 'containers', 'images', 'networks', 'volumes'] if before[key] != result[key]]
         audit = {'status': 'PASS' if not changes else 'ENVIRONMENT EXCEPTION', 'changed_sections': changes,
                  'scope': 'IDs/container states between two read-only snapshots only; no causal attribution'}
-        (folder / 'docker-isolation.json').write_text(json.dumps(audit, indent=2) + '\n')
+        (folder / 'docker-isolation.json').write_text(json.dumps(audit, indent=2) + '\n', encoding='utf-8')
         print(audit)

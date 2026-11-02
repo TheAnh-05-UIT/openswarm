@@ -1,4 +1,4 @@
-"""Read-only Docker Registry v2 verification; never pulls layers or stores tokens."""
+"""Đọc metadata Docker Registry v2; không pull layer hoặc lưu token."""
 import concurrent.futures
 import datetime
 import hashlib

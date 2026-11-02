@@ -1,4 +1,4 @@
-"""Optional NumPy-only arithmetic unit checks; no TensorFlow/training/network."""
+"""Kiểm tra số học bằng NumPy tùy chọn; không chạy TensorFlow, training hay mạng."""
 import importlib.util
 from pathlib import Path
 import unittest

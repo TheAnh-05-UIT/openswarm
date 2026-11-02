@@ -1,7 +1,7 @@
-"""Offline tests. Optional SWOP contract tests use an already installed package.
+"""Kiểm thử cục bộ; các test SWOP tùy chọn dùng package đã có sẵn.
 
-No test starts/pulls/builds/stops any Docker resource. Compose config is tested
-separately. Run with: python -B -m unittest discover -s tests -v
+Không tạo, pull, build hoặc dừng tài nguyên Docker. Compose config có bộ kiểm tra
+riêng. Lệnh chạy: python -B -m unittest discover -s tests -v
 """
 import copy
 import hashlib
@@ -24,9 +24,9 @@ def module(name, path):
     return value
 init = module('initialize', ROOT / 'config/initialize.py')
 verify = module('verify', ROOT / 'config/verify.py')
-COMPOSE = json.loads((ROOT / 'compose.yaml').read_text())
-TEMPLATE = json.loads((ROOT / 'config/profile.template.json').read_text())
-ENV = dict(line.split('=', 1) for line in (ROOT / '.env.example').read_text().splitlines() if line and not line.startswith('#'))
+COMPOSE = json.loads((ROOT / 'compose.yaml').read_text(encoding='utf-8'))
+TEMPLATE = json.loads((ROOT / 'config/profile.template.json').read_text(encoding='utf-8'))
+ENV = dict(line.split('=', 1) for line in (ROOT / '.env.example').read_text(encoding='utf-8').splitlines() if line and not line.startswith('#'))
 ENV.update(RUN_ID='20261101t120000z-1234abcd', EXCLUSIVE_OWNER_ACK='true')
 ASSET = (ROOT / 'config/assets/initial.iutfw').read_bytes()
 WORK = ROOT / 'tests/tmp'
@@ -77,6 +77,15 @@ class ComposeTests(unittest.TestCase):
             self.assertEqual(s['cap_drop'], ['ALL']); self.assertTrue(s['read_only'])
         self.assertEqual(COMPOSE['services']['bundle-init']['cap_add'], ['CHOWN', 'SETUID', 'SETGID'])
         self.assertEqual(COMPOSE['services']['bundle-init']['network_mode'], 'none')
+    def test_direct_scripts_can_import_image_packages(self):
+        # Khi chạy file trực tiếp, Python đưa /config vào sys.path[0]; cần PYTHONPATH=/app.
+        for name in ('bundle-init', 'verify', 'verify-fedavg', 'client-a', 'client-b', 'sl-a', 'sl-b'):
+            self.assertEqual(COMPOSE['services'][name]['environment']['PYTHONPATH'], '/app')
+    def test_tensorflow_cache_is_writable_tmpfs(self):
+        for name in ('client-a', 'client-b', 'verify-fedavg'):
+            env = COMPOSE['services'][name]['environment']
+            self.assertEqual(env['HOME'], '/tmp')
+            self.assertEqual(env['KERAS_HOME'], '/tmp/.keras')
     def test_init_is_dependency(self):
         for s in ('sn', 'sl-a', 'sl-b', 'client-a', 'client-b', 'round-controller'):
             self.assertEqual(COMPOSE['services'][s]['depends_on']['bundle-init']['condition'], 'service_completed_successfully')
@@ -95,13 +104,13 @@ class ComposeTests(unittest.TestCase):
         self.assertEqual(sum(int(s['mem_limit'][:-1]) for s in active), 5760)
         self.assertTrue(all(s['mem_limit'] == '2048m' for name, s in COMPOSE['services'].items() if name.startswith('client-')))
     def test_env_exactly_used(self):
-        variables = set(re.findall(r'\$\{([A-Z][A-Z0-9_]*)', (ROOT / 'compose.yaml').read_text()))
+        variables = set(re.findall(r'\$\{([A-Z][A-Z0-9_]*)', (ROOT / 'compose.yaml').read_text(encoding='utf-8')))
         self.assertEqual(variables, set(ENV))
     def test_required_placeholders(self):
-        self.assertEqual(dict(line.split('=', 1) for line in (ROOT / '.env.example').read_text().splitlines() if '=' in line and not line.startswith('#'))['RUN_ID'], '')
+        self.assertEqual(dict(line.split('=', 1) for line in (ROOT / '.env.example').read_text(encoding='utf-8').splitlines() if '=' in line and not line.startswith('#'))['RUN_ID'], '')
         self.assertNotIn('secrets', COMPOSE)
     def test_secrets_ignored_bootstrap_tracked(self):
-        ignore = (ROOT / '.gitignore').read_text()
+        ignore = (ROOT / '.gitignore').read_text(encoding='utf-8')
         self.assertIn('secrets/*', ignore); self.assertIn('!secrets/.gitkeep', ignore)
         self.assertNotIn('*.iutfw', ignore)
     def test_no_monitoring(self):
@@ -135,7 +144,7 @@ class ProfileTests(unittest.TestCase):
             init.make_profile(TEMPLATE, {**ENV, 'SAMPLES_A': '256', 'EPOCHS': '10', 'BATCH_SIZE': '1'})
     def test_prepare_reject_nonempty_before_chown(self):
         with tempfile.TemporaryDirectory(dir=WORK) as tmp:
-            Path(tmp, 'old-evidence').write_text('retain')
+            Path(tmp, 'old-evidence').write_text('retain', encoding='utf-8')
             with patch.object(init.os, 'chown', create=True) as chown:
                 with self.assertRaises(ValueError): init.prepare_mounts([tmp])
                 chown.assert_not_called(); self.assertTrue(Path(tmp, 'old-evidence').exists())
@@ -162,11 +171,11 @@ class InstalledSwopTests(unittest.TestCase):
                 self.assertEqual(cfg['controller']['run_id'], ENV['RUN_ID'])
                 self.assertEqual(cfg['sn_url'], 'http://sn.openswarm.internal:8000')
     def test_bundle_deterministic_same_input_path(self):
-        # Generator config embeds its final mount path, so compare equal targets.
+        # Cấu hình sinh ra chứa đường dẫn mount cuối cùng; đối chiếu trên cùng đích.
         with tempfile.TemporaryDirectory(dir=WORK) as tmp:
             target = Path(tmp) / 'bundle'; p = init.make_profile(TEMPLATE, ENV)
             one = init.generate(p, ASSET, target)
-            shutil.rmtree(target); shutil.rmtree(target.parent / 'input')  # Test files only; never Docker resources.
+            shutil.rmtree(target); shutil.rmtree(target.parent / 'input')  # Chỉ sửa file fixture kiểm thử, không thao tác tài nguyên Docker.
             two = init.generate(p, ASSET, target)
             self.assertEqual(one, two)
     def test_existing_output_refused(self):
@@ -239,7 +248,7 @@ class ShellTests(unittest.TestCase):
             with self.subTest(case=name), tempfile.TemporaryDirectory(dir=WORK) as tmp:
                 for directory in ('scripts', 'config'):
                     shutil.copytree(ROOT / directory, Path(tmp) / directory)
-                Path(tmp, '.env').write_text(''.join(k + '=' + v + '\n' for k, v in {**ENV, **change}.items()))
+                Path(tmp, '.env').write_text(''.join(k + '=' + v + '\n' for k, v in {**ENV, **change}.items()), encoding='utf-8')
                 result = subprocess.run([BASH, '-c', 'source "$1/scripts/common.sh"; load_settings; printf "%s" "$PROJECT"', '_', Path(tmp).as_posix()], capture_output=True, text=True)
                 self.assertEqual(result.returncode == 0, allowed, result.stderr)
                 self.assertFalse(Path(tmp, 'SHOULD_NOT_EXIST').exists())
@@ -250,9 +259,9 @@ class ShellTests(unittest.TestCase):
             for directory in ('scripts', 'config'):
                 shutil.copytree(ROOT / directory, root / directory)
             shutil.copy2(ROOT / 'compose.yaml', root / 'compose.yaml')
-            (root / '.env').write_text(''.join(k + '=' + v + '\n' for k, v in ENV.items()))
+            (root / '.env').write_text(''.join(k + '=' + v + '\n' for k, v in ENV.items()), encoding='utf-8')
             fake = root / 'fake-bin'; fake.mkdir()
-            (fake / 'uname').write_text('#!/usr/bin/env bash\nprintf "aarch64\\n"\n')
+            (fake / 'uname').write_text('#!/usr/bin/env bash\nprintf "aarch64\\n"\n', encoding='utf-8')
             (fake / 'docker').write_text('''#!/usr/bin/env bash
 set -eu
 printf '%s\\n' "$*" >> "$MOCK_LOG"
@@ -273,18 +282,19 @@ case "$1" in
   inspect)
     if [[ "$*" == *io.openswarm.deployment.owner* ]]; then
       if [[ "$MODE" == stop-foreign ]]; then printf 'wrong|other|wrong\\n'; else printf 'openswarm-20261101t120000z-1234abcd|openswarm-deployment|20261101t120000z-1234abcd\\n'; fi
-    elif [[ "$*" == *com.docker.compose.service* ]]; then printf 'round-controller\\n'
+    elif [[ "$*" == *com.docker.compose.service* ]]; then
+      if [[ "$MODE" == stop-numeric ]]; then printf 'verify-fedavg\\n'; else printf 'round-controller\\n'; fi
     else printf 'true\\n'; fi
     exit 0 ;;
 esac
 exit 96
-''')
+''', encoding='utf-8')
             for path in fake.iterdir(): path.chmod(0o755)
             log = root / 'docker-calls.log'
-            # All commands resolve to this fake Docker, never the real Engine.
+            # Mọi lệnh ở đây đi vào Docker giả, không gọi Engine thật.
             code = 'root=$(cd "$1" && pwd); export PATH="$root/fake-bin:$PATH"; export MOCK_LOG="$root/docker-calls.log"; export MODE="$2"; unset DOCKER_HOST; hash -r; bash "$root/scripts/$3"'
             proc = subprocess.run([BASH, '-c', code, '_', root.as_posix(), mode, script], capture_output=True, text=True)
-            return proc, log.read_text() if log.exists() else ''
+            return proc, log.read_text(encoding='utf-8') if log.exists() else ''
 
     def test_start_new_project_mock(self):
         proc, calls = self.scenario('start.sh', 'fresh')
@@ -306,6 +316,10 @@ exit 96
         self.assertEqual(calls.count('container stop --timeout 30 owned-id'), 1)
         for forbidden in (' prune', ' rm ', ' down', ' kill'):
             self.assertNotIn(forbidden, calls)
+    def test_stop_includes_owned_numeric_verifier_mock(self):
+        proc, calls = self.scenario('stop.sh', 'stop-numeric')
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(calls.count('container stop --timeout 30 owned-id'), 1)
     def test_logs_do_not_mutate_mock(self):
         proc, calls = self.scenario('logs.sh', 'fresh')
         self.assertEqual(proc.returncode, 0, proc.stderr)
