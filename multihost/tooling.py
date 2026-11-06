@@ -28,6 +28,14 @@ PLACEMENT = {
 }
 IMAGES = {role: 'docker.io/24520115/independent-' + repo + ':v0.1.0-arm64'
           for role, repo in [('sn', 'sn'), ('sl', 'sl'), ('user_tf', 'user-tf'), ('swop', 'swop')]}
+# Giữ bản cũ để xác minh bundle đã có; chỉ bổ sung đúng release SL đã đối chiếu Registry.
+SL_V11 = 'docker.io/24520115/independent-sl:v0.1.1-arm64'
+SL_V11_INDEX = 'sha256:dd6fada36039aca41cd3b9590a09484027ebbd067f0fe5ec3bc6faad79ff31fc'
+SL_V11_PLATFORM = 'sha256:4863cca792d1cffea3b7840f5754521f00325bf3c4a48b4b75146fdeb5d9ff6d'
+SL_V11_CONFIG = 'sha256:53eb296748e2f0a0758e1d47980e21abb9cfbf5422fcec33a2f4283d49492c74'
+SL_V11_PINNED = SL_V11 + '@' + SL_V11_INDEX
+REVIEWED_IMAGES = {role: frozenset((ref,)) for role, ref in IMAGES.items()}
+REVIEWED_IMAGES['sl'] = frozenset((IMAGES['sl'], SL_V11, SL_V11_PINNED))
 CONTRACT = 'independent-multihost.bundle.v1'
 
 
@@ -193,8 +201,10 @@ def validate_profile(path):
     for sid, (role, host) in PLACEMENT.items():
         service = services[sid]
         require((service['role'], service['host']) == (role, host), 'Invalid host placement: ' + sid)
-        require(image_reference(service['image']) == IMAGES[role], 'Only reviewed v0.1.0-arm64 image references are supported')
+        require(image_reference(service['image']) in REVIEWED_IMAGES[role], 'Only exact reviewed ARM64 image references are supported')
     require(image_reference(data['deployment']['swop_image']) == IMAGES['swop'], 'Reviewed SWOP image required')
+    require(image_reference(services['sl-a']['image']) == image_reference(services['sl-b']['image']),
+            'Both SL peers must use the same reviewed image reference')
     for suffix in ('a', 'b'):
         require(services['sl-' + suffix]['peer_id'] == 'sl-' + suffix, 'Expected distinct sl-a/sl-b peer IDs')
         client = services['client-' + suffix]

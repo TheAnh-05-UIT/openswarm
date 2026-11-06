@@ -157,7 +157,8 @@ def parse_env(path):
     result = {}
     for line in bundle.read_file(path, 32768).decode('utf-8').splitlines():
         if not line or line.startswith('#'): continue
-        match = re.fullmatch(r'([A-Z][A-Z0-9_]*)=([A-Za-z0-9_./:\\-]*)', line)
+        # Ký tự @ phục vụ image tag@sha256; toàn bộ giá trị vẫn phải khớp canonical env.
+        match = re.fullmatch(r'([A-Z][A-Z0-9_]*)=([A-Za-z0-9_./:@\\-]*)', line)
         bundle.require(match is not None and match[1] not in result, 'Use unique literal KEY=VALUE settings; no shell/Compose interpolation')
         result[match[1]] = match[2]
     return result
