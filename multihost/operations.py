@@ -4,13 +4,45 @@ start/stop cần cờ xác nhận thực thi của operator. Công cụ host ch�
 chuẩn Python; SWOP, TensorFlow và các ứng dụng chạy trong Docker image.
 """
 import argparse
+from datetime import datetime
 import json
 import os
+import re
 import subprocess
 import time
 import runtime_contract as contract
 import preflight
 import tooling as bundle
+
+LOGGING_POLICY = {'driver': 'json-file', 'options': {'max-size': '10m', 'max-file': '3'}}
+
+
+def valid_since(value):
+    """Chỉ nhận timestamp UTC tuyệt đối RFC3339; không nhận shell/duration tùy ý."""
+    if value is None:
+        return None
+    bundle.require(re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?Z', value) is not None,
+                   'since must be an absolute UTC RFC3339 timestamp ending in Z')
+    try:
+        datetime.strptime(value[:19], '%Y-%m-%dT%H:%M:%S')
+    except ValueError as exc:
+        raise bundle.BundleError('Invalid since calendar/time') from exc
+    return value
+
+
+def log_snapshot(ctx, runner, existing, tail, since):
+    """Trả prefix + metadata nếu bị cắt; không coi snapshot là cursor exactly-once."""
+    command = contract.compose_args(ctx, 'logs', '--no-color', '--timestamps', '--tail', str(tail))
+    if since is not None:
+        command.extend(['--since', since])
+    # Chỉ dùng roster đã vượt qua toàn bộ ownership checks; không mở rộng project.
+    command.extend(sorted(existing))
+    result = runner.capture(command, ctx, timeout=30) if existing else preflight.Capture('', '', 0, 0, 0, preflight.DEFAULT_BUDGET)
+    code = 3 if not result.complete else 2 if result.returncode else 0
+    return {'host': ctx.host, 'logs': result.stdout, 'stderr': result.stderr,
+            'status': 'INCOMPLETE' if code == 3 else 'FAIL' if code else 'PASS',
+            'timestamps': True, 'since': since, 'capture': result.metadata(),
+            'boundary_overlap_possible': True}, code
 
 
 def validate_rendered(ctx, data):
@@ -26,6 +58,7 @@ def validate_rendered(ctx, data):
         image = ctx.env['SN_IMAGE'] if role == 'sn' else ctx.env['SL_IMAGE'] if role.startswith('sl-') else ctx.env['USER_TF_IMAGE'] if role.startswith('client-') else ctx.env['SWOP_IMAGE']
         bundle.require(service['image'] == image and service['platform'] == 'linux/arm64'
                        and service['entrypoint'] == original['entrypoint'] and service.get('command', []) == original['command'], 'Image/entrypoint/CMD differs from SWOP runtime contract')
+        bundle.require(service.get('logging') == LOGGING_POLICY, 'Explicit bounded Docker logging policy required')
         bundle.require(service['user'] == '65532:65532' and service['read_only'] is True and service['restart'] == 'no'
                        and not service.get('privileged', False) and 'ALL' in service['cap_drop']
                        and 'no-new-privileges:true' in service['security_opt'] and 'network_mode' not in service, 'Unsafe runtime security/network mode')
@@ -160,9 +193,15 @@ def main(argv=None):
         if name == 'start':
             c.add_argument('--ack-container-paths', action='store_true'); c.add_argument('--ack-remote-client', action='store_true')
         if name == 'preflight': c.add_argument('--probe-endpoints', action='store_true')
-        if name == 'logs': c.add_argument('--tail', type=int, default=100)
+        if name == 'logs':
+            c.add_argument('--tail', type=int, default=100)
+            c.add_argument('--since', help='UTC RFC3339 timestamp, ví dụ 2026-11-05T10:00:00Z')
     args = parser.parse_args(argv)
     try:
+        exit_code = 0
+        if args.command == 'logs':
+            bundle.require(1 <= args.tail <= 1000, 'Logs tail must be 1..1000')
+            args.since = valid_since(args.since)
         if args.command == 'configure':
             result = {'status': 'CONFIGURED_OFFLINE', 'settings': contract.configure(args.job_root, args.host, args.expected_id, args.output)}
         else:
@@ -170,7 +209,9 @@ def main(argv=None):
             runner = preflight.Runner(approved=getattr(args, 'execute_approved', False))
             if args.command == 'check':
                 render(ctx, runner); result = {'status': 'PASS', 'scope': 'Pinned import + static Compose only', 'host': ctx.host, 'physical_connectivity': 'NOT VERIFIED'}
-            elif args.command == 'preflight': result = preflight.observations(ctx, runner, args.probe_endpoints)
+            elif args.command == 'preflight':
+                result = preflight.observations(ctx, runner, args.probe_endpoints)
+                exit_code = preflight.readiness(result, ctx.host, args.probe_endpoints)
             elif args.command == 'plan':
                 role, command = plan_start(ctx, args.stage); result = {'status': 'NOT EXECUTED', 'service': role, 'command': command, 'requires_operator_approval': True}
             elif args.command == 'start': result = start(ctx, runner, args.stage, args.ack_container_paths, args.ack_remote_client)
@@ -180,9 +221,11 @@ def main(argv=None):
                 if args.command == 'status':
                     result = {'host': ctx.host, 'project': ctx.project, 'services': {k: {'id': v['id'], 'status': v['state'].get('Status'), 'exit_code': v['state'].get('ExitCode'), 'health': v['state'].get('Health', {}).get('Status')} for k, v in existing.items()}}
                 else:
-                    bundle.require(1 <= args.tail <= 1000, 'Logs tail must be 1..1000')
-                    result = {'host': ctx.host, 'logs': runner.read(contract.compose_args(ctx, 'logs', '--no-color', '--tail', str(args.tail), *sorted(existing)), ctx, timeout=30) if existing else ''}
-        print(json.dumps(result, indent=2)); return 0
+                    result, exit_code = log_snapshot(ctx, runner, existing, args.tail, args.since)
+        print(json.dumps(result, indent=2, allow_nan=False)); return exit_code
+    except preflight.CaptureError as exc:
+        print(json.dumps({'status': 'FAIL', 'error': str(exc), 'capture': exc.capture,
+                          'automatic_retry_cleanup': False})); return 2
     except (ValueError, OSError, KeyError, TypeError, subprocess.SubprocessError) as exc:
         print(json.dumps({'status': 'FAIL', 'error': str(exc)[:512], 'automatic_retry_cleanup': False})); return 2
 

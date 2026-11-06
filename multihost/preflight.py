@@ -7,6 +7,17 @@ import subprocess
 from urllib.parse import urlsplit
 import runtime_contract as contract
 import tooling as bundle
+from bounded_process import Capture, DEFAULT_BUDGET, collect
+
+
+class CaptureError(bundle.BundleError):
+    """Giữ metadata lỗi nhưng không chèn raw logs, args hoặc secrets vào thông báo."""
+    def __init__(self, result, mutation=False):
+        self.result = result  # Diagnostic bị giới hạn vẫn có sẵn cho caller tin cậy, không tự in.
+        self.capture = result.metadata()
+        note = 'Operation may be partial; no automatic retry/cleanup' if mutation else 'Read-only command failed or incomplete'
+        super().__init__(note + f' (exit={result.returncode}, truncated={result.truncated}, '
+                         f'timed_out={result.timed_out}, decode_replaced={result.decode_replaced}, read_error={result.read_error})')
 
 
 class Runner:
@@ -15,20 +26,23 @@ class Runner:
         self.approved = approved
 
     def read(self, args, ctx, timeout=10):
-        process = subprocess.run(args, capture_output=True, text=True, timeout=timeout,
-                                 env=contract.clean_environment(ctx), cwd=contract.ROOT)
-        bundle.require(process.returncode == 0, 'Read-only command failed: ' + ' '.join(args[:3]) + ': ' + process.stderr[:300])
-        bundle.require(len(process.stdout) <= 1024 * 1024, 'Command response too large')
-        return process.stdout.strip()
+        result = self.capture(args, ctx, timeout)
+        if result.returncode != 0 or not result.complete:
+            raise CaptureError(result)
+        return result.stdout.strip()
+
+    def capture(self, args, ctx, timeout=10):
+        """Logs được nhận prefix + metadata; callers đọc cấu hình phải dùng read()."""
+        return collect(args, timeout=timeout, env=contract.clean_environment(ctx), cwd=contract.ROOT)
 
     def change(self, args, ctx):
         bundle.require(self.approved, 'Explicit operator execution approval is required')
         allowed = args[:3] == ['docker', 'container', 'stop'] or (args[:2] == ['docker', 'compose'] and 'up' in args)
         bundle.require(allowed, 'Unsupported mutation; cleanup/pull/restart/delete is not implemented')
-        process = subprocess.run(args, capture_output=True, text=True, timeout=120,
-                                 env=contract.clean_environment(ctx), cwd=contract.ROOT)
-        bundle.require(process.returncode == 0, 'Operation failed; state may be partial; no automatic retry/cleanup')
-        return process.stdout.strip()
+        result = self.capture(args, ctx, timeout=120)
+        if result.returncode != 0 or not result.complete:
+            raise CaptureError(result, mutation=True)
+        return result.stdout.strip()
 
     def get(self, url, path, timeout=2):
         p = urlsplit(url)
@@ -43,6 +57,30 @@ class Runner:
             return response.status, bundle.strict_json(raw)
         finally:
             connection.close()
+
+
+def readiness(report, host, probe_endpoints=False):
+    """Exit 0 chỉ khi các gate bắt buộc PASS; observation không cấp phép deploy."""
+    required = {'bundle_host_identity', 'host_architecture', 'local_host_engine_compose',
+                'resource_ownership', 'private_interface', 'peer_route'}
+    required.update('port_' + r for r in contract.ROLES[host] if not r.startswith('client-'))
+    # Khi operator yêu cầu probe, các SN/SL endpoints trở thành gate HTTP host.
+    # Controller có thể chưa chạy; container paths/native training luôn là observation.
+    if probe_endpoints:
+        required.update('host_endpoint_' + r for r in ('sn', 'sl-a', 'sl-b'))
+    checks = {row['check']: row for row in report['checks']}
+    gates = [{'check': name, 'status': checks.get(name, {}).get('status', 'NOT TESTED')}
+             for name in sorted(required)]
+    if any(g['status'] == 'FAIL' for g in gates):
+        status, code = 'FAIL', 2
+    elif any(g['status'] != 'PASS' for g in gates):
+        status, code = 'INCOMPLETE', 3
+    else:
+        status, code = 'PASS', 0
+    report.update(readiness={'status': status, 'mandatory_checks': gates,
+                            'observation_checks': sorted(set(checks) - required),
+                            'exit_code': code}, deployment_authorized=False)
+    return code
 
 
 def local_engine(ctx, runner):

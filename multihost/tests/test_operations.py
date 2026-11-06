@@ -165,6 +165,13 @@ class OperationalTests(unittest.TestCase):
         data = copy.deepcopy(self.models['rpi5']); data['services']['sn']['labels']['io.openswarm.rebuild.owner'] = 'foreign'
         with self.assertRaises(ValueError): operations.validate_rendered(self.ctx, data)
 
+    def test_missing_or_changed_logging_rejected(self):
+        for policy in (None, {'driver': 'none'}, {'driver': 'json-file', 'options': {'max-size': '1g', 'max-file': '3'}}):
+            data = copy.deepcopy(self.models['rpi5'])
+            if policy is None: data['services']['sn'].pop('logging')
+            else: data['services']['sn']['logging'] = policy
+            with self.assertRaises(ValueError): operations.validate_rendered(self.ctx, data)
+
     def test_wrong_mount_or_automatic_bind_creation_rejected(self):
         for key, value in [('read_only', False), ('bind', {'create_host_path': True})]:
             data = copy.deepcopy(self.models['rpi5']); data['services']['sl-a']['volumes'][0][key] = value
