@@ -29,8 +29,8 @@ TEMPLATE = json.loads((ROOT / 'config/profile.template.json').read_text(encoding
 ENV = dict(line.split('=', 1) for line in (ROOT / '.env.example').read_text(encoding='utf-8').splitlines() if line and not line.startswith('#'))
 ENV.update(RUN_ID='20261101t120000z-1234abcd', EXCLUSIVE_OWNER_ACK='true')
 ASSET = (ROOT / 'config/assets/initial.iutfw').read_bytes()
-WORK = ROOT / 'tests/tmp'
-WORK.mkdir(exist_ok=True)
+WORK = Path(os.environ.get('OPENSWARM_TEST_WORK', ROOT / 'tests/tmp'))
+WORK.mkdir(parents=True, exist_ok=True)
 HAS_SWOP = importlib.util.find_spec('swop') is not None
 BASH = os.environ.get('BASH_BIN') or shutil.which('bash')
 
@@ -46,6 +46,7 @@ class ComposeTests(unittest.TestCase):
     def test_only_arm64_images(self):
         for s in COMPOSE['services'].values():
             self.assertEqual(s['platform'], 'linux/arm64'); self.assertNotIn('build', s)
+            self.assertEqual(s['logging'], {'driver': 'json-file', 'options': {'max-size': '10m', 'max-file': '3'}})
     def test_no_published_ports(self):
         for s in COMPOSE['services'].values():
             self.assertNotIn('ports', s); self.assertNotIn('privileged', s)

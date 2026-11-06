@@ -95,7 +95,14 @@
           "target": "/controller-data",
           "read_only": false
         }
-      ]
+      ],
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
     },
     "sn": {
       "platform": "linux/arm64",
@@ -162,6 +169,13 @@
         "timeout": "5s",
         "start_period": "45s",
         "retries": 18
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
       }
     },
     "sl-a": {
@@ -234,6 +248,13 @@
         "timeout": "5s",
         "start_period": "45s",
         "retries": 18
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
       }
     },
     "client-a": {
@@ -307,7 +328,14 @@
           "target": "/tmp/checkpoints",
           "read_only": false
         }
-      ]
+      ],
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
     },
     "sl-b": {
       "platform": "linux/arm64",
@@ -379,6 +407,13 @@
         "timeout": "5s",
         "start_period": "45s",
         "retries": 18
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
       }
     },
     "client-b": {
@@ -452,7 +487,14 @@
           "target": "/tmp/checkpoints",
           "read_only": false
         }
-      ]
+      ],
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
     },
     "round-controller": {
       "platform": "linux/arm64",
@@ -527,7 +569,14 @@
           "target": "/controller-data",
           "read_only": false
         }
-      ]
+      ],
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
     },
     "verify": {
       "platform": "linux/arm64",
@@ -606,7 +655,14 @@
           "target": "/checkpoint-b",
           "read_only": true
         }
-      ]
+      ],
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
     },
     "verify-fedavg": {
       "platform": "linux/arm64",
@@ -686,7 +742,14 @@
       "profiles": [
         "tools"
       ],
-      "network_mode": "none"
+      "network_mode": "none",
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
     }
   },
   "networks": {

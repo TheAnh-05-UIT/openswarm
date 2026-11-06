@@ -25,6 +25,12 @@ x-runtime: &runtime
   networks: [lab]
   pids_limit: 256
   stop_grace_period: 30s
+  # Chỉ áp dụng khi tạo container mới; không tự đổi logging của job đang chạy.
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
   tmpfs:
     - /tmp:rw,nosuid,nodev,size=134217728,uid=65532,gid=65532
 
