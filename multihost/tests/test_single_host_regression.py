@@ -16,7 +16,7 @@ AVAILABLE = (importlib.util.find_spec('swop') is not None and importlib.util.fin
 @unittest.skipUnless(AVAILABLE, 'Existing SWOP/NumPy/Bash required; no installation or Docker fallback')
 class SingleHostRegression(unittest.TestCase):
     def test_accepted_offline_suite_in_relocated_copy(self):
-        work = ROOT / 'tests/tmp'; work.mkdir(exist_ok=True)
+        work = Path(os.environ.get('OPENSWARM_TEST_WORK', ROOT / 'tests/tmp')); work.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=work) as tmp:
             target = Path(tmp) / 'single-host-copy'; target.mkdir()
             assert target.resolve().is_relative_to(work.resolve())
@@ -31,8 +31,9 @@ class SingleHostRegression(unittest.TestCase):
             stream = io.StringIO()
             result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
             # Kết quả test ghi vào thư mục evidence bị loại khỏi Git.
-            (ROOT / 'evidence').mkdir(exist_ok=True)
-            (ROOT / 'evidence/single-host-regression.txt').write_text(stream.getvalue(), encoding='utf-8')
+            evidence = Path(os.environ.get('OPENSWARM_TEST_EVIDENCE', ROOT / 'evidence'))
+            evidence.mkdir(parents=True, exist_ok=True)
+            (evidence / 'single-host-regression.txt').write_text(stream.getvalue(), encoding='utf-8')
             self.assertEqual(result.testsRun, 51, stream.getvalue())
             self.assertEqual(len(result.skipped), 0, stream.getvalue())
             self.assertTrue(result.wasSuccessful(), stream.getvalue())

@@ -3,6 +3,7 @@
 Không gọi up/down/run/pull và không cần kết nối Docker daemon.
 """
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -14,7 +15,7 @@ def main():
                        if line and not line.startswith('#'))
     environment.update(RUN_ID='20261101t120000z-1234abcd', EXCLUSIVE_OWNER_ACK='true')
     results = []
-    work = ROOT / 'tests/tmp'; work.mkdir(exist_ok=True)
+    work = Path(os.environ.get('OPENSWARM_TEST_WORK', ROOT / 'tests/tmp')); work.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=work) as tmp:
         repo = Path(tmp) / 'relocated'
         # Chỉ sao chép đầu vào triển khai để kiểm tra repo không lệ thuộc thư mục gốc.
@@ -49,8 +50,9 @@ def main():
     report = {'scope': 'static parsing only, relocated config; no image pull or containers',
               'required_static_secrets': 'NOT APPLICABLE: these images require none; missing RUN_ID/owner ACK are tested',
               'runtime': 'NOT VERIFIED', 'results': results}
-    (ROOT / 'tests/evidence').mkdir(exist_ok=True)
-    (ROOT / 'tests/evidence/compose-validation.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
+    evidence = Path(os.environ.get('OPENSWARM_TEST_EVIDENCE', ROOT / 'tests/evidence'))
+    evidence.mkdir(parents=True, exist_ok=True)
+    (evidence / 'compose-validation.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     for result in results:
         print(result['case'], result['status'], result['exit_code'])
     if any(r['status'] != 'PASS' for r in results):

@@ -25,8 +25,9 @@ def worker(copy_root, source, evidence):
     result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
     (evidence / 'tests.txt').write_text(stream.getvalue(), encoding='utf-8')
     for name in ('single-host-regression.txt',):
-        generated = copy_root / 'multihost/evidence' / name
-        if generated.exists(): shutil.copy2(generated, evidence / name)
+        generated = Path(os.environ.get('OPENSWARM_TEST_EVIDENCE', copy_root / 'multihost/evidence')) / name
+        if generated.exists() and generated.resolve() != (evidence / name).resolve():
+            shutil.copy2(generated, evidence / name)
     summary = {'scope': 'Offline relocated-copy tests; real Docker CLI used only for Compose CONFIG; operational/native probes use fakes',
                'tests': result.testsRun, 'failures': len(result.failures), 'errors': len(result.errors),
                'skipped': len(result.skipped), 'success': result.wasSuccessful()}
@@ -43,9 +44,9 @@ def main():
     args = parser.parse_args()
     source = args.swop_source.resolve() if args.swop_source else None
     if source and not (source / 'swop/profile.py').is_file(): parser.error('Không tìm thấy package SWOP tại đường dẫn đã chọn')
-    evidence = ROOT / 'evidence'; evidence.mkdir(exist_ok=True)
+    evidence = Path(os.environ.get('OPENSWARM_TEST_EVIDENCE', ROOT / 'evidence')); evidence.mkdir(parents=True, exist_ok=True)
     if args.worker_copy: return worker(args.worker_copy, source, evidence)
-    work = ROOT / 'tests/tmp'; work.mkdir(exist_ok=True)
+    work = Path(os.environ.get('OPENSWARM_TEST_WORK', ROOT / 'tests/tmp')); work.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='c-', dir=work) as tmp:
         repo = Path(tmp) / 'repo'; repo.mkdir()
         assert repo.resolve().is_relative_to(work.resolve())

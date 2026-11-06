@@ -22,8 +22,8 @@ sys.path.insert(0, str(ROOT))
 import tooling as tool
 
 HAS_SWOP = importlib.util.find_spec('swop') is not None
-WORK = ROOT / 'tests/tmp'
-WORK.mkdir(exist_ok=True)
+WORK = Path(os.environ.get('OPENSWARM_TEST_WORK', ROOT / 'tests/tmp'))
+WORK.mkdir(parents=True, exist_ok=True)
 
 
 def fixture():
