@@ -11,11 +11,15 @@ Không chứa mã OpenSwarm/HPE thu hồi chưa được cấp phép.
 |---|---|---|
 | Một board chạy toàn bộ hệ thống | [single-host.md](docs/single-host.md) | Operator xác nhận native ARM64 PASS riêng trên RPi 5 và Orange Pi 5 Pro |
 | Hai board cùng tham gia một job | [multi-host.md](docs/multi-host.md) | Cấu hình/tooling đã kiểm thử cục bộ; runtime giữa hai board chưa được xác minh |
-| Kiểm tra host/mạng trước khi chạy | [preflight.md](docs/preflight.md) | Chỉ đọc; không thay thế kiểm thử đường mạng ứng dụng |
+| Cài Docker Engine/Compose trên Ubuntu ARM64 | [install-docker.md](docs/install-docker.md) | Dành cho máy mới; máy đã chạy job không cài lại |
+| Dừng/gỡ single-host hoặc multi-host | [remove-deployment.md](docs/remove-deployment.md) | Kiểm ownership; xóa từng resource được chọn |
 
 Một lần chạy một board vẫn có hai SL và hai client. Hai lần chạy riêng trên hai
 board **không chứng minh** đã thực hiện một job multi-host chung.
 Monitoring/Grafana chưa thuộc bộ triển khai này và vẫn có blocker phát hành riêng.
+Chính sách rotation cho container mới, cách đọc logs có timestamp và exit code
+preflight được mô tả trong hai hướng dẫn triển khai. Cập nhật repo không thay
+logging của containers hiện tại; không recreate SN đang giữ state trong RAM.
 
 ## Bắt đầu với một board
 
@@ -96,8 +100,9 @@ manifest digest và tag/index digest từ bằng chứng đã lưu. Tag có th�
 
 ## Phát triển và kiểm chứng
 
-Xem [development.md](docs/development.md) để chạy kiểm tra offline trên bản clone
-độc lập, và [research-evidence.md](docs/research-evidence.md) để lưu bằng chứng
-đúng nguồn. Test cục bộ/Compose config PASS không được coi là native runtime hoặc
+Các bước kiểm thử offline và lưu bằng chứng đã gộp vào
+[single-host.md](docs/single-host.md) và [multi-host.md](docs/multi-host.md).
+Thư mục docs chỉ giữ bốn hướng dẫn trong bảng đầu trang.
+Test cục bộ/Compose config PASS không được coi là native runtime hoặc
 multi-host training PASS. Repo không tự cài dependency, chỉnh Docker/OS, SSH,
 deploy từ xa, cleanup toàn cục hay đẩy image.

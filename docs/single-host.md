@@ -1,6 +1,6 @@
-# OpenSwarm Independent — ARM64 Docker Deployment
+# Triển khai single-host trên một board ARM64
 
-> Operator xác nhận native ARM64 single-host PASS riêng trên Raspberry Pi 5 và Orange Pi 5 Pro, gồm hai rounds và cả hai verifiers. Raw evidence còn cần lưu bổ sung; xem [kế hoạch bằng chứng](research-evidence.md). Đây không phải xác nhận training multi-host. Monitoring bị chặn phát hành riêng, không thay đổi trạng thái bốn image đã publish và được sử dụng thành công.
+> Operator xác nhận native ARM64 single-host PASS riêng trên Raspberry Pi 5 và Orange Pi 5 Pro, gồm hai rounds và cả hai verifiers. Raw evidence còn cần lưu bổ sung theo mục 7 bên dưới. Đây không phải xác nhận training multi-host. Monitoring bị chặn phát hành riêng, không thay đổi trạng thái bốn image đã publish và được sử dụng thành công.
 
 Triển khai **OpenSwarm Independent** trên **Raspberry Pi 5** hoặc **Orange Pi 5 Pro** bằng Docker Compose, sử dụng các Docker image đã được build sẵn trên Docker Hub.
 
@@ -39,7 +39,7 @@ Cấu hình mặc định: **2 rounds**, Client-A **16 samples**, Client-B **32 
 - **Tài nguyên:** khuyến nghị RAM từ **8 GiB**, đủ dung lượng lưu trữ trống (nên dự trù **ít nhất 10 GiB trước khi tải images**), nguồn điện và tản nhiệt ổn định.
 - **Kết nối Internet:** để clone GitHub và pull Docker images.
 
-Nếu chưa cài Docker, làm theo [hướng dẫn cài Docker Engine trên Ubuntu](https://docs.docker.com/engine/install/ubuntu/) và [Docker Compose plugin](https://docs.docker.com/compose/install/linux/). Không cần cài TensorFlow hay Python lên host.
+Nếu chưa cài Docker, làm theo [install-docker.md](install-docker.md). Không cần cài TensorFlow hay Python lên host. Máy đã có Docker hoạt động không cần cài lại.
 
 Kiểm tra trực tiếp trên Pi:
 
@@ -75,7 +75,8 @@ Nếu đã clone từ trước, vào thư mục `~/openswarm`, kiểm tra thay �
 ### Bước 2 — Tạo file cấu hình `.env`
 
 ```bash
-cp -n .env.example .env
+test ! -e .env || { echo 'Đã có .env: giữ cấu hình job cũ và review trước'; exit 1; }
+cp .env.example .env
 ```
 
 Tạo một `RUN_ID` mới và tự điền vào `.env`:
@@ -119,7 +120,7 @@ LEARNING_RATE=0.05
 ### Bước 3 — Kiểm tra cấu hình trước khi chạy
 
 ```bash
-bash scripts/check.sh
+sudo bash scripts/check.sh
 ```
 
 Kết quả thành công có dạng:
@@ -133,15 +134,15 @@ Lệnh này chỉ kiểm tra cấu hình và Docker Engine; chưa khởi chạy 
 ### Bước 4 — Pull images và khởi chạy
 
 ```bash
-bash scripts/start.sh
+sudo bash scripts/start.sh
 ```
 
 Script sẽ **tự pull 4 images**, tạo network/volumes và khởi động các services. **Không cần chạy thêm `docker compose pull` hay `docker compose up -d`** sau lệnh này.
 
-Kiểm tra trạng thái:
+Kiểm tra trạng thái đúng project theo `.env`:
 
 ```bash
-docker compose ps -a
+sudo bash -c 'source scripts/common.sh; load_settings; dc ps --all'
 ```
 
 Ban đầu các clients và controller có thể đang `Up`; sau khi hoàn thành, chúng sẽ chuyển thành `Exited (0)`.
@@ -149,13 +150,13 @@ Ban đầu các clients và controller có thể đang `Up`; sau khi hoàn thàn
 ### Bước 5 — Theo dõi training
 
 ```bash
-docker compose logs --tail=100 round-controller
+sudo bash -c 'source scripts/common.sh; load_settings; dc logs --tail 100 round-controller'
 ```
 
 Hoặc xem logs các services trong thời gian thực:
 
 ```bash
-bash scripts/logs.sh
+sudo bash scripts/logs.sh
 ```
 
 Nhấn `Ctrl+C` để thoát chế độ theo dõi logs; thao tác này không dừng containers.
@@ -173,8 +174,8 @@ Các tín hiệu thành công cần tìm trong logs gồm:
 Sau khi `client-a`, `client-b`, `round-controller` đều **Exited (0)**, chạy **mỗi verifier một lần cho một RUN_ID**:
 
 ```bash
-bash scripts/verify.sh
-bash scripts/verify-fedavg.sh
+sudo bash scripts/verify.sh
+sudo bash scripts/verify-fedavg.sh
 ```
 
 `verify.sh` kiểm tra journal, **4 completion receipts**, hai global checkpoints và khả năng carry-over mô hình từ Round 1 sang Round 2.
@@ -190,7 +191,7 @@ bash scripts/verify-fedavg.sh
 Nếu muốn dừng các services còn chạy sau khi đã lưu kết quả:
 
 ```bash
-bash scripts/stop.sh
+sudo bash scripts/stop.sh
 ```
 
 Lệnh này chỉ dừng containers thuộc job hiện tại; **không xóa images, containers, networks hoặc volumes**. Không dùng `docker compose down -v`, `docker volume prune` hoặc các lệnh xóa dữ liệu khi cần giữ bằng chứng.
@@ -248,23 +249,55 @@ Source ứng dụng không cần có trên Pi; các runtime liên quan được 
 
 Docker Compose sử dụng network nội bộ cho lab; không publish các API điều phối/training ra Internet.
 
-Người phát triển đọc [development.md](development.md); nhận dạng image đã lưu nằm trong [image-manifest.json](../config/image-manifest.json). Kết quả tests mới chỉ lưu tại máy, không cần đưa lên GitHub.
+Nhận dạng image đã lưu nằm trong [image-manifest.json](../config/image-manifest.json). Kết quả tests mới chỉ lưu tại máy, không cần đưa lên GitHub.
 
----
+## 7. Logging, dữ liệu và lưu bằng chứng
 
-**Tóm tắt lệnh chạy lần đầu (sau khi đã cài Docker, Git và đáp ứng yêu cầu ARM64):**
+Compose của repo đặt `json-file`, `max-size=10m`, `max-file=3` cho container mới,
+kể cả init/verifiers. Khoảng30 MB/container là budget danh nghĩa, không phải
+hard cap đĩa. Còn images, writable layer, journal, checkpoint và log job cũ.
+Kiểm cả dung lượng/inode tại DockerRootDir, containerd root và nơi lưu evidence.
+
+Git pull không thay HostConfig của container đang chạy. Không recreate SN hoặc
+truncate file Docker log đang mở để áp dụng rotation. Khi đĩa không đủ, dừng kế
+hoạch job mới và review capacity, không cleanup toàn cục.
+
+| Volume trong project `openswarm-<RUN_ID>` | Nội dung |
+|---|---|
+| `deployment` | Bundle/profile/runtime khởi tạo |
+| `checkpoint-a`, `checkpoint-b` | Weights/checkpoint của hai clients |
+| `controller-data` | Journal và completion receipts |
+
+Tên thực có prefix `<PROJECT>_`. Runtime UID:GID65532:65532; init chuẩn bị quyền
+cho volume mới. Checkpoint không phục hồi SN epoch trong RAM. Không chown/xóa
+volume cũ để vượt lỗi và không resume một job bằng restart.
+
+Lưu evidence ngoài repo, theo RUN_ID: host/kernel/Engine architecture, image
+references/digests, container IDs/labels/states, logs, journal/receipts/checkpoints,
+output verifiers và sai số thật. Ghi command, thời gian thu, exit status; tính
+SHA-256 sau khi thu. Không dựng lại logs/timestamps hoặc dùng số0.0 của lần chạy
+trước. Một snapshot stats không chứng minh peak RAM/CPU; journal không có clock
+cho mọi event. Che token/secrets trước khi chia sẻ, không commit `.env` hay dữ liệu
+live lên GitHub. Known issue TensorFlow I/O duplicate `gs` không chứng minh GCS
+hoạt động; workload chỉ dùng synthetic data và checkpoint cục bộ.
+
+Muốn xóa containers/network/volumes, làm theo
+[remove-deployment.md](remove-deployment.md). `scripts/stop.sh` chỉ stop job được
+chọn và giữ dữ liệu; quyền xóa cần xác nhận riêng.
+
+## 8. Kiểm thử repo trên máy phát triển
+
+Không phải yêu cầu cài Python lên board single-host. Dùng Python3.11/Bash và các
+package đã chuẩn bị ở máy phát triển, không tự cài dependency trong script:
 
 ```bash
-git clone https://github.com/TheAnh-05-UIT/openswarm.git
-cd openswarm
-cp -n .env.example .env
-RUN_ID="$(date -u +%Y%m%dt%H%M%Sz)-$(od -An -N4 -tx1 /dev/urandom | tr -d '[:space:]')"
-sed -i "s/^RUN_ID=.*/RUN_ID=$RUN_ID/" .env
-# Chỉ bật acknowledgement nếu chắc chắn có một round writer:
-sed -i 's/^EXCLUSIVE_OWNER_ACK=.*/EXCLUSIVE_OWNER_ACK=true/' .env
-bash scripts/check.sh
-bash scripts/start.sh
-# Sau khi client-a, client-b và controller đều Exited (0):
-bash scripts/verify.sh
-bash scripts/verify-fedavg.sh
+python3 -B tests/check_repository.py
+python3 -B -m unittest discover -s tests -v
+python3 -B tests/validate_compose.py
 ```
+
+Tests tùy chọn cần SWOP/NumPy; thiếu package và SKIP không phải toàn suite PASS.
+Compose config chỉ parse cấu hình, không kiểm runtime. Có thể đặt
+`OPENSWARM_TEST_WORK`/`OPENSWARM_TEST_EVIDENCE` thành path test ngoài repo;
+không trỏ vào dữ liệu live. Tên file tiếng Anh, hướng dẫn/chú thích tiếng Việt,
+textUTF-8, shellLF. Giữ nguyên [LICENSE](../LICENSE) và [NOTICE](../NOTICE.md).

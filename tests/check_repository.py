@@ -2,6 +2,7 @@
 import ast
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 
@@ -16,9 +17,12 @@ def main():
                 'secrets/.gitkeep', 'config/assets/initial.iutfw', 'config/profile.template.json',
                 'config/initialize.py', 'config/verify.py', 'config/verify_fedavg.py',
                 'scripts/check.sh', 'scripts/start.sh', 'scripts/stop.sh', 'scripts/logs.sh',
-                'docs/single-host.md', 'docs/multi-host.md', 'docs/preflight.md',
-                'docs/development.md', 'docs/research-evidence.md', 'config/image-manifest.json']
-    check('required deploy files present', all((ROOT / p).is_file() for p in required))
+                'docs/single-host.md', 'docs/multi-host.md', 'docs/install-docker.md',
+                'docs/remove-deployment.md', 'config/image-manifest.json']
+    # Bốn tài liệu vận hành là toàn bộ docs/, tránh tái tạo các hướng dẫn trùng lặp.
+    expected_docs = {'single-host.md', 'multi-host.md', 'install-docker.md', 'remove-deployment.md'}
+    check('required deploy files present', all((ROOT / p).is_file() for p in required)
+          and {p.name for p in (ROOT / 'docs').iterdir()} == expected_docs)
     check('no symlink escape', all(not p.is_symlink() and p.resolve().is_relative_to(ROOT) for p in paths))
     compose = json.loads((ROOT / 'compose.yaml').read_text(encoding='utf-8'))
     check('only image references; no build', all('image' in s and 'build' not in s for s in compose['services'].values()))
@@ -62,8 +66,9 @@ def main():
     status = 'PASS' if all(r['status'] == 'PASS' for r in results) else 'FAIL'
     output = {'status': status, 'scope': 'Offline file checks; no Docker/Git, native or runtime claim',
               'checks': results, 'required_static_secrets': 'N/A; current services require none'}
-    (ROOT / 'tests/evidence').mkdir(exist_ok=True)
-    (ROOT / 'tests/evidence/repository-checks.json').write_text(json.dumps(output, indent=2) + '\n', encoding='utf-8')
+    evidence = Path(os.environ.get('OPENSWARM_TEST_EVIDENCE', ROOT / 'tests/evidence'))
+    evidence.mkdir(parents=True, exist_ok=True)
+    (evidence / 'repository-checks.json').write_text(json.dumps(output, indent=2) + '\n', encoding='utf-8')
     print(status, len(results), 'repository checks')
     for item in results:
         if item['status'] != 'PASS': print(item)

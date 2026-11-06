@@ -2,7 +2,8 @@
 
 Thư mục này chứa cấu hình và công cụ cho hai Docker Engines Linux ARM64 độc lập.
 Đọc [multi-host.md](../docs/multi-host.md) trước khi chạy; kiểm tra host/mạng theo
-[preflight.md](../docs/preflight.md). Các lệnh không cần thư mục ứng dụng ngoài repo.
+[phần preflight trong cùng hướng dẫn](../docs/multi-host.md#6-preflight-chỉ-đọc-và-kiểm-tra-mạng).
+Các lệnh không cần thư mục ứng dụng ngoài repo.
 Chưa có bằng chứng một job training chung chạy trên hai board vật lý.
 
 ## Vai trò và nhận dạng
@@ -59,8 +60,12 @@ riêng; không nhắm vào project một host `openswarm-<RUN_ID>`.
 
 ## Các giới hạn phải đọc
 
-- CLI preflight có thể trả exit0 dù JSON chứa FAIL; đọc từng check, không nối
-  `preflight && start` làm cơ chế phê duyệt.
+- CLI preflight trả 0 khi các gate bắt buộc PASS, 2 khi có gate FAIL, 3 nếu
+  thiếu gate hoặc UNKNOWN/NOT TESTED. Đọc `readiness` và từng observation;
+  exit0 không cấp phép deploy. Không nối `preflight && start` thay phê duyệt.
+- Logs thêm timestamps và nhận `--since` UTC tuyệt đối, có metadata byte budget/
+  truncation; xem [multi-host.md](../docs/multi-host.md). Policy rotation chỉ dành
+  container mới, không được recreate SN đang giữ epoch để áp dụng ngay.
 - Preflight cần import hợp lệ; board chưa import dùng checklist read-only trước.
 - GET từ host không chứng minh đường mạng container/hairpin hoặc transfer model.
 - Controller mở listener rồi có thể mở round ngay; không có listener-only mode.
